@@ -782,10 +782,11 @@ export default function ServerDetail() {
                 {activeTextChannel && currentUser && server?.owner_id === currentUser.id && (
                   <button
                     onClick={() => setIsEditChannelOpen(true)}
-                    className="mr-2 hidden items-center gap-1 rounded-lg bg-[#35373d] px-3 py-1.5 text-xs font-semibold text-slate-300 transition hover:bg-[#40424a] hover:text-white md:flex"
+                    className="mr-2 inline-flex items-center gap-1 rounded-lg bg-[#35373d] px-2.5 py-1.5 text-xs font-semibold text-slate-300 transition hover:bg-[#40424a] hover:text-white"
+                    title="Edit Channel"
                   >
                     <Settings className="h-3.5 w-3.5" />
-                    Edit Channel
+                    <span className="hidden sm:inline">Edit Channel</span>
                   </button>
                 )}
 

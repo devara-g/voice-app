@@ -6,8 +6,12 @@ import {
   RoomAudioRenderer,
   useParticipants,
   useLocalParticipant,
+  useTracks,
+  TrackLoop,
+  VideoTrack,
 } from '@livekit/components-react';
-import { Mic, MicOff, PhoneOff, Users, ChevronDown } from 'lucide-react';
+import { Track } from 'livekit-client';
+import { Mic, MicOff, PhoneOff, Users, ChevronDown, ScreenShare, ScreenShareOff } from 'lucide-react';
 import '@livekit/components-styles';
 import { playJoinSound, playLeaveSound, playMemberJoinSound, playMemberLeaveSound } from '@/lib/sounds';
 
@@ -76,7 +80,10 @@ export default function VoiceChat({
       const reason = event.reason;
       if (
         reason &&
-        (reason.name === 'PublishTrackError' ||
+        (reason.name === 'NotAllowedError' ||
+          reason.message?.includes('Permission denied') ||
+          reason.message?.includes('getDisplayMedia') ||
+          reason.name === 'PublishTrackError' ||
           reason.message?.includes('engine not connected') ||
           reason.message?.includes('LiveKit') ||
           reason.message?.includes('signal connection'))
@@ -187,8 +194,12 @@ function ActiveVoiceRoom({
   onDisconnect: () => void;
 }) {
   const participants = useParticipants();
-  const { localParticipant, isMicrophoneEnabled } = useLocalParticipant();
+  const { localParticipant, isMicrophoneEnabled, isScreenShareEnabled } = useLocalParticipant();
+  const screenShareTracks = useTracks([
+    { source: Track.Source.ScreenShare, withPlaceholder: false },
+  ]);
   const prevCountRef = useRef(participants.length);
+  const [screenShareError, setScreenShareError] = useState<string | null>(null);
 
   // SFX saat ada orang lain join/leave (bukan kita sendiri)
   useEffect(() => {
@@ -205,6 +216,23 @@ function ActiveVoiceRoom({
   const toggleMute = async () => {
     if (localParticipant) {
       await localParticipant.setMicrophoneEnabled(!isMicrophoneEnabled);
+    }
+  };
+
+  const toggleScreenShare = async () => {
+    if (localParticipant) {
+      try {
+        setScreenShareError(null);
+        await localParticipant.setScreenShareEnabled(!isScreenShareEnabled);
+      } catch (err) {
+        console.error('Screen share toggle failed:', err);
+        const message =
+          err instanceof Error &&
+          (err.name === 'NotAllowedError' || err.message.includes('Permission denied'))
+            ? 'Izin share screen ditolak browser.'
+            : 'Gagal menyalakan share screen.';
+        setScreenShareError(message);
+      }
     }
   };
 
@@ -329,8 +357,35 @@ function ActiveVoiceRoom({
         )}
       </div>
 
+      {screenShareTracks.length > 0 && (
+        <div className="border-t border-[#1e1f22] bg-[#1e1f22] px-4 py-3">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <div className="text-white text-sm font-semibold">Share Screen Aktif</div>
+              <div className="text-slate-400 text-xs">Peserta sedang membagikan layar.</div>
+            </div>
+            <div className="text-[10px] uppercase tracking-[0.2em] text-indigo-300 font-bold">
+              Live
+            </div>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <TrackLoop tracks={screenShareTracks}>
+              <VideoTrack className="w-full rounded-xl border border-[#35373d] bg-black aspect-video object-cover" />
+            </TrackLoop>
+          </div>
+        </div>
+      )}
+
+      {screenShareError && (
+        <div className="px-4 pt-3">
+          <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300">
+            {screenShareError}
+          </div>
+        </div>
+      )}
+
       {/* Control Bar */}
-      <div className="bg-[#2b2d31] p-4 flex items-center justify-center gap-4 border-t border-[#1e1f22] shadow-2xl">
+      <div className="bg-[#2b2d31] p-4 flex items-center justify-center gap-3 border-t border-[#1e1f22] shadow-2xl flex-wrap">
         <button
           onClick={toggleMute}
           className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-200 ${
@@ -341,6 +396,18 @@ function ActiveVoiceRoom({
           title={isMicrophoneEnabled ? 'Bisukan Mikrofon' : 'Aktifkan Mikrofon'}
         >
           {isMicrophoneEnabled ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
+        </button>
+
+        <button
+          onClick={toggleScreenShare}
+          className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-200 ${
+            isScreenShareEnabled
+              ? 'bg-[#5865f2] text-white hover:bg-[#4752c4] hover:scale-105'
+              : 'bg-[#35373d] text-slate-300 hover:bg-[#404249] hover:text-white hover:scale-105'
+          }`}
+          title={isScreenShareEnabled ? 'Berhenti berbagi layar' : 'Bagikan layar'}
+        >
+          {isScreenShareEnabled ? <ScreenShareOff className="w-5 h-5" /> : <ScreenShare className="w-5 h-5" />}
         </button>
 
         {/* Minimize */}
