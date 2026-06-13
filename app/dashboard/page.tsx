@@ -3,8 +3,11 @@
 import { supabase } from '@/lib/supabaseClient';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { Plus, LogOut, Compass, Server, ChevronRight } from 'lucide-react';
+import { Plus, LogOut, Compass, Server, ChevronRight, Users, UserPlus, Link } from 'lucide-react';
 import ProfileModal from '@/components/ProfileModal';
+import FriendsPanel from '@/components/FriendsPanel';
+import JoinServerModal from '@/components/JoinServerModal';
+import InviteModal from '@/components/InviteModal';
 
 interface ServerData {
   id: string;
@@ -17,6 +20,7 @@ export default function Dashboard() {
   const [servers, setServers] = useState<ServerData[]>([]);
   const [loading, setLoading] = useState(true);
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   
   // State untuk modal kustom
@@ -29,24 +33,50 @@ export default function Dashboard() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 
+  // State untuk fitur baru
+  const [isFriendsPanelOpen, setIsFriendsPanelOpen] = useState(false);
+  const [isJoinServerOpen, setIsJoinServerOpen] = useState(false);
+  const [inviteModalServerId, setInviteModalServerId] = useState<string | null>(null);
+  const [inviteModalServerName, setInviteModalServerName] = useState<string | null>(null);
+
   useEffect(() => {
-    const fetchServers = async (userId: string) => {
+    const fetchServers = async (uid: string) => {
       setLoading(true);
       setErrorMessage(null);
       
-      const { data, error } = await supabase
+      // Fetch servers owned by user
+      const { data: ownedServers, error: ownedError } = await supabase
         .from('servers')
         .select('*')
-        .eq('owner_id', userId)
+        .eq('owner_id', uid)
         .order('created_at', { ascending: true });
       
-      if (error) {
-        console.error('Error fetching servers:', error.message, error.code, error.details, error.hint);
-        setErrorMessage(error.message);
-      } else {
-        setServers(data || []);
+      if (ownedError) {
+        console.error('Error fetching owned servers:', ownedError.message);
+        setErrorMessage(ownedError.message);
+        setLoading(false);
+        return;
       }
-      
+
+      // Fetch servers user has joined as member (but not owner)
+      const { data: memberRows } = await supabase
+        .from('members')
+        .select('server_id')
+        .eq('user_id', uid);
+
+      let joinedServers: ServerData[] = [];
+      if (memberRows && memberRows.length > 0) {
+        const joinedIds = memberRows.map((m: { server_id: string }) => m.server_id);
+        const { data: joinedData } = await supabase
+          .from('servers')
+          .select('*')
+          .in('id', joinedIds)
+          .neq('owner_id', uid) // Exclude owned servers
+          .order('created_at', { ascending: true });
+        joinedServers = joinedData || [];
+      }
+
+      setServers([...(ownedServers || []), ...joinedServers]);
       setLoading(false);
     };
 
@@ -58,6 +88,7 @@ export default function Dashboard() {
         return;
       } else {
         setUserEmail(user.email ?? null);
+        setUserId(user.id);
         setDisplayName(user.user_metadata?.display_name ?? user.email?.split('@')[0] ?? 'User');
         setAvatarUrl(user.user_metadata?.avatar_url ?? 'preset:purple');
       }
@@ -110,6 +141,11 @@ export default function Dashboard() {
     }
   };
 
+  const handleJoinedServer = (serverId: string) => {
+    setIsJoinServerOpen(false);
+    router.push(`/server/${serverId}`);
+  };
+
   const getPresetClasses = (id: string) => {
     const presets: Record<string, string> = {
       'preset:pink': 'from-pink-500 to-rose-500',
@@ -140,7 +176,7 @@ export default function Dashboard() {
     return (
       <div className="min-h-screen bg-[#1e1f22] flex flex-col items-center justify-center">
         <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-4" />
-        <div className="text-gray-400 text-sm font-medium">Memuatkan data Anda...</div>
+        <div className="text-gray-400 text-sm font-medium">Memuat data Anda...</div>
       </div>
     );
   }
@@ -201,7 +237,21 @@ export default function Dashboard() {
           
           {/* Tooltip */}
           <div className="absolute left-full ml-3 px-2 py-1 bg-black text-white text-xs font-semibold rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-30 shadow-lg">
-            Tambah Server
+            Buat Server
+          </div>
+        </div>
+
+        {/* Tombol gabung server */}
+        <div
+          onClick={() => setIsJoinServerOpen(true)}
+          className="group relative w-12 h-12 flex items-center justify-center cursor-pointer"
+        >
+          <div className="absolute left-0 w-1 bg-indigo-400 rounded-r-md transition-all duration-200 origin-left scale-y-0 group-hover:scale-y-[0.6] h-8" />
+          <div className="w-12 h-12 bg-[#2b2d31] rounded-2xl hover:rounded-xl transition-all flex items-center justify-center text-indigo-400 hover:bg-indigo-600 hover:text-white shadow-md">
+            <Link className="w-5 h-5" />
+          </div>
+          <div className="absolute left-full ml-3 px-2 py-1 bg-black text-white text-xs font-semibold rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-30 shadow-lg">
+            Gabung Server
           </div>
         </div>
       </div>
@@ -214,7 +264,26 @@ export default function Dashboard() {
             <Compass className="w-5 h-5 text-indigo-400" />
             <span>SiHALO Dashboard</span>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
+            {/* Friends Button */}
+            <button
+              onClick={() => setIsFriendsPanelOpen(true)}
+              className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-zinc-800/40 hover:bg-zinc-800/80 border border-zinc-800/60 hover:border-zinc-700 text-slate-300 hover:text-white transition text-sm font-semibold"
+              title="Teman"
+            >
+              <Users className="w-4 h-4" />
+              <span>Teman</span>
+            </button>
+
+            {/* Add Friend shortcut */}
+            <button
+              onClick={() => { setIsFriendsPanelOpen(true); }}
+              className="w-8 h-8 rounded-xl bg-zinc-800/40 hover:bg-indigo-600/60 border border-zinc-800/60 hover:border-indigo-500/50 flex items-center justify-center text-slate-400 hover:text-white transition"
+              title="Tambah Teman"
+            >
+              <UserPlus className="w-4 h-4" />
+            </button>
+
             {/* Clickable Profile Card */}
             <div 
               onClick={() => setIsProfileModalOpen(true)}
@@ -261,7 +330,14 @@ export default function Dashboard() {
               <h1 className="text-white text-2xl font-extrabold tracking-tight">Pelayan Anda ({servers.length})</h1>
               <p className="text-slate-400 text-sm mt-1">Pilih server di bawah ini untuk memulai obrolan suara</p>
             </div>
-            {servers.length > 0 && (
+            <div className="flex gap-2">
+              <button
+                onClick={() => setIsJoinServerOpen(true)}
+                className="flex items-center gap-2 bg-[#2b2d31] hover:bg-[#35373d] border border-[#35373d] text-slate-300 hover:text-white px-4 py-2.5 rounded-xl text-sm font-bold transition active:scale-95"
+              >
+                <Link className="w-4 h-4" />
+                <span>Gabung Server</span>
+              </button>
               <button
                 onClick={() => setIsCreateModalOpen(true)}
                 className="flex items-center gap-2 bg-[#5865f2] hover:bg-[#4752c4] text-white px-4 py-2.5 rounded-xl text-sm font-bold transition shadow-lg shadow-indigo-500/20 active:scale-95"
@@ -269,7 +345,7 @@ export default function Dashboard() {
                 <Plus className="w-4 h-4" />
                 <span>Buat Server</span>
               </button>
-            )}
+            </div>
           </div>
 
           {errorMessage && (
@@ -286,47 +362,74 @@ export default function Dashboard() {
             <div className="text-center py-20 bg-[#2b2d31]/40 border border-[#2b2d31] rounded-2xl max-w-md mx-auto mt-10">
               <div className="w-16 h-16 bg-[#35373d] rounded-2xl flex items-center justify-center mx-auto mb-4 text-4xl shadow-inner">🌐</div>
               <h3 className="text-white text-lg font-bold">Belum Ada Pelayan</h3>
-              <p className="text-slate-400 text-sm mt-1 px-6">Anda belum memiliki server sendiri. Buat server pertama Anda secara instan.</p>
-              <button
-                onClick={() => setIsCreateModalOpen(true)}
-                className="mt-6 bg-[#5865f2] hover:bg-[#4752c4] text-white px-6 py-2.5 rounded-xl text-sm font-bold transition shadow-lg shadow-indigo-500/25 active:scale-95"
-              >
-                + Buat Server Pertama
-              </button>
+              <p className="text-slate-400 text-sm mt-1 px-6">Buat server baru atau gabung ke server orang lain menggunakan kode undangan.</p>
+              <div className="flex gap-3 justify-center mt-6">
+                <button
+                  onClick={() => setIsJoinServerOpen(true)}
+                  className="bg-[#35373d] hover:bg-[#404249] text-white px-5 py-2.5 rounded-xl text-sm font-bold transition active:scale-95 flex items-center gap-2"
+                >
+                  <Link className="w-4 h-4" />
+                  Gabung Server
+                </button>
+                <button
+                  onClick={() => setIsCreateModalOpen(true)}
+                  className="bg-[#5865f2] hover:bg-[#4752c4] text-white px-5 py-2.5 rounded-xl text-sm font-bold transition shadow-lg shadow-indigo-500/25 active:scale-95 flex items-center gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  Buat Server
+                </button>
+              </div>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {servers.map((server) => (
                 <div
                   key={server.id}
-                  onClick={() => router.push(`/server/${server.id}`)}
-                  className="bg-[#2b2d31] rounded-2xl overflow-hidden cursor-pointer border border-[#35373d]/50 hover:border-slate-700 hover:shadow-xl transition-all duration-300 hover:scale-[1.02] flex flex-col group"
+                  className="bg-[#2b2d31] rounded-2xl overflow-hidden cursor-pointer border border-[#35373d]/50 hover:border-slate-700 hover:shadow-xl transition-all duration-300 hover:scale-[1.02] flex flex-col group relative"
                 >
                   {/* Bagian Atas - Gradien Warna */}
-                  <div className={`h-24 bg-gradient-to-tr ${getGradient(server.name)} relative flex items-end p-4`}>
+                  <div
+                    onClick={() => router.push(`/server/${server.id}`)}
+                    className={`h-24 bg-gradient-to-tr ${getGradient(server.name)} relative flex items-end p-4`}
+                  >
                     <div className="absolute top-4 right-4 bg-black/35 backdrop-blur-md px-2 py-1 rounded-md text-[10px] text-white uppercase tracking-wider font-bold border border-white/5">
-                      Server ID
+                      Server
                     </div>
                   </div>
 
                   {/* Konten Kartu */}
                   <div className="p-5 flex-1 flex flex-col justify-between">
-                    <div className="flex gap-4 items-center">
+                    <div
+                      onClick={() => router.push(`/server/${server.id}`)}
+                      className="flex gap-4 items-center"
+                    >
                       <div className={`w-12 h-12 bg-gradient-to-tr ${getGradient(server.name)} rounded-2xl flex items-center justify-center text-white text-xl font-bold shadow-lg`}>
                         {server.name.charAt(0).toUpperCase()}
                       </div>
                       <div className="flex-1 min-w-0">
                         <h3 className="text-white font-bold text-base truncate group-hover:text-indigo-400 transition">{server.name}</h3>
-                        <p className="text-slate-400 text-xs mt-0.5">Milik Anda • Pembuat</p>
+                        <p className="text-slate-400 text-xs mt-0.5">Voice channels ready</p>
                       </div>
                     </div>
 
-                    <div className="mt-6 pt-4 border-t border-[#35373d]/60 flex items-center justify-between text-xs text-slate-400">
-                      <span className="flex items-center gap-1.5">
-                        <Server className="w-3.5 h-3.5 text-slate-500" />
-                        <span>Voice channels ready</span>
-                      </span>
-                      <span className="text-indigo-400 font-semibold group-hover:translate-x-1 transition flex items-center gap-0.5">
+                    <div className="mt-6 pt-4 border-t border-[#35373d]/60 flex items-center justify-between text-xs">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setInviteModalServerId(server.id);
+                          setInviteModalServerName(server.name);
+                        }}
+                        className="flex items-center gap-1.5 text-slate-500 hover:text-indigo-400 transition font-semibold"
+                        title="Undang teman"
+                      >
+                        <Link className="w-3.5 h-3.5" />
+                        <span>Undang</span>
+                      </button>
+                      <span
+                        onClick={() => router.push(`/server/${server.id}`)}
+                        className="text-indigo-400 font-semibold group-hover:translate-x-1 transition flex items-center gap-0.5 cursor-pointer"
+                      >
+                        <Server className="w-3.5 h-3.5 text-slate-500 mr-1" />
                         <span>Masuk</span>
                         <ChevronRight className="w-3.5 h-3.5" />
                       </span>
@@ -384,6 +487,32 @@ export default function Dashboard() {
         <ProfileModal
           onClose={() => setIsProfileModalOpen(false)}
           onProfileUpdate={refreshProfile}
+        />
+      )}
+
+      {/* Friends Panel */}
+      {isFriendsPanelOpen && userId && (
+        <FriendsPanel
+          currentUserId={userId}
+          onClose={() => setIsFriendsPanelOpen(false)}
+        />
+      )}
+
+      {/* Join Server Modal */}
+      {isJoinServerOpen && userId && (
+        <JoinServerModal
+          userId={userId}
+          onClose={() => setIsJoinServerOpen(false)}
+          onJoined={handleJoinedServer}
+        />
+      )}
+
+      {/* Invite Modal */}
+      {inviteModalServerId && inviteModalServerName && (
+        <InviteModal
+          serverId={inviteModalServerId}
+          serverName={inviteModalServerName}
+          onClose={() => { setInviteModalServerId(null); setInviteModalServerName(null); }}
         />
       )}
     </div>

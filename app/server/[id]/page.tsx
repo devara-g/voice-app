@@ -2,11 +2,12 @@
 
 import { supabase } from '@/lib/supabaseClient';
 import { useRouter, useParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import VoiceChat from '@/components/VoiceChat';
 import { User } from '@supabase/supabase-js';
-import { Plus, Compass, Users, Volume2, ChevronRight, LogOut as LeaveIcon } from 'lucide-react';
+import { Plus, Compass, Users, Volume2, ChevronRight, LogOut as LeaveIcon, Link, Mic, PhoneOff } from 'lucide-react';
 import ProfileModal from '@/components/ProfileModal';
+import InviteModal from '@/components/InviteModal';
 
 interface Server {
   id: string;
@@ -41,6 +42,7 @@ export default function ServerDetail() {
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [activeVoiceChannel, setActiveVoiceChannel] = useState<{ id: string; name: string } | null>(null);
+  const [isVoiceVisible, setIsVoiceVisible] = useState(false);
 
   // State untuk modal kustom saluran suara
   const [isCreateChannelOpen, setIsCreateChannelOpen] = useState(false);
@@ -57,6 +59,46 @@ export default function ServerDetail() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [refreshCount, setRefreshCount] = useState(0);
+
+  // State untuk invite
+  const [isInviteOpen, setIsInviteOpen] = useState(false);
+
+  // State untuk peserta di tiap voice channel (realtime polling)
+  const [channelParticipants, setChannelParticipants] = useState<Record<string, { identity: string; name: string; metadata: string }[]>>({});
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Fungsi poll participants semua voice channel di server ini
+  const pollParticipants = useCallback(async (channelList: Channel[]) => {
+    if (!serverId || channelList.length === 0) return;
+    const updates: Record<string, { identity: string; name: string; metadata: string }[]> = {};
+    await Promise.all(
+      channelList.map(async (ch) => {
+        try {
+          const roomName = `${serverId}_${ch.id}`;
+          const res = await fetch(`/api/livekit/participants?roomName=${encodeURIComponent(roomName)}`);
+          if (res.ok) {
+            const data = await res.json();
+            updates[ch.id] = data.participants || [];
+          }
+        } catch {
+          // silent — channel mungkin belum pernah dipakai
+        }
+      })
+    );
+    setChannelParticipants((prev) => ({ ...prev, ...updates }));
+  }, [serverId]);
+
+  // Start polling ketika channels sudah di-load
+  useEffect(() => {
+    if (channels.length === 0) return;
+    // Poll langsung
+    pollParticipants(channels);
+    // Poll tiap 5 detik
+    pollingRef.current = setInterval(() => pollParticipants(channels), 5000);
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+    };
+  }, [channels, pollParticipants]);
 
   useEffect(() => {
     const createDefaultChannel = async () => {
@@ -229,6 +271,7 @@ export default function ServerDetail() {
 
   const joinVoiceChannel = (channelId: string, channelName: string) => {
     setActiveVoiceChannel({ id: channelId, name: channelName });
+    setIsVoiceVisible(true);
   };
 
   const getPresetClasses = (id: string) => {
@@ -347,6 +390,13 @@ export default function ServerDetail() {
           {/* Header Server Name */}
           <div className="h-14 flex items-center justify-between px-4 border-b border-[#1e1f22] shadow-sm bg-[#2b2d31]/80 backdrop-blur-md">
             <h2 className="text-white font-extrabold text-sm truncate uppercase tracking-wider">{server?.name}</h2>
+            <button
+              onClick={() => setIsInviteOpen(true)}
+              className="w-7 h-7 bg-[#35373d] hover:bg-indigo-600 rounded-lg flex items-center justify-center text-slate-400 hover:text-white transition flex-shrink-0"
+              title="Undang teman"
+            >
+              <Link className="w-3.5 h-3.5" />
+            </button>
           </div>
           
           {/* Saluran Suara */}
@@ -362,21 +412,89 @@ export default function ServerDetail() {
               </button>
             </div>
             
-            <div className="space-y-1">
-              {channels.map((channel) => (
-                <div
-                  key={channel.id}
-                  onClick={() => joinVoiceChannel(channel.id, channel.name)}
-                  className="flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-[#35373d] text-slate-300 hover:text-white cursor-pointer group transition-all"
-                >
-                  <Volume2 className="w-4 h-4 text-slate-500 group-hover:text-slate-300" />
-                  <span className="text-sm font-semibold flex-1 truncate">{channel.name}</span>
-                  <span className="text-indigo-400 text-xs opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5 font-bold">
-                    <span>Masuk</span>
-                    <ChevronRight className="w-3 h-3" />
-                  </span>
-                </div>
-              ))}
+            <div className="space-y-0.5">
+              {channels.map((channel) => {
+                const participants = channelParticipants[channel.id] || [];
+                const isActive = activeVoiceChannel?.id === channel.id;
+                return (
+                  <div key={channel.id} className="rounded-lg overflow-hidden">
+                    {/* Baris Channel */}
+                    <div
+                      onClick={() => joinVoiceChannel(channel.id, channel.name)}
+                      className={`flex items-center gap-2.5 px-3 py-2 cursor-pointer group transition-all ${
+                        isActive
+                          ? 'bg-[#35373d] text-white'
+                          : 'hover:bg-[#35373d] text-slate-300 hover:text-white'
+                      }`}
+                    >
+                      <Volume2 className={`w-4 h-4 flex-shrink-0 ${
+                        participants.length > 0 ? 'text-green-400' : isActive ? 'text-indigo-400' : 'text-slate-500 group-hover:text-slate-300'
+                      }`} />
+                      <span className="text-sm font-semibold flex-1 truncate">{channel.name}</span>
+                      {participants.length > 0 && (
+                        <span className="text-green-400 text-[10px] font-bold bg-green-500/10 px-1.5 py-0.5 rounded-full">
+                          {participants.length}
+                        </span>
+                      )}
+                      {participants.length === 0 && (
+                        <span className="text-indigo-400 text-xs opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5 font-bold">
+                          <span>Masuk</span>
+                          <ChevronRight className="w-3 h-3" />
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Daftar peserta di channel */}
+                    {participants.length > 0 && (
+                      <div className="pl-8 pb-1 space-y-0.5">
+                        {participants.map((p) => {
+                          const presets: Record<string, string> = {
+                            'preset:pink': 'from-pink-500 to-rose-500',
+                            'preset:purple': 'from-purple-500 to-indigo-500',
+                            'preset:blue': 'from-blue-500 to-cyan-500',
+                            'preset:emerald': 'from-emerald-500 to-teal-500',
+                            'preset:orange': 'from-orange-500 to-amber-500',
+                          };
+                          const hasPreset = p.metadata?.startsWith('preset:');
+                          const gradClass = hasPreset
+                            ? presets[p.metadata] || 'from-purple-500 to-indigo-500'
+                            : 'from-purple-500 to-indigo-500';
+                          const isMe = currentUser?.email === p.identity;
+
+                          return (
+                            <div
+                              key={p.identity}
+                              className="flex items-center gap-2 px-2 py-1 rounded-md hover:bg-[#2b2d31]/60 transition group/p"
+                            >
+                              {/* Mini avatar */}
+                              {hasPreset || !p.metadata ? (
+                                <div className={`w-5 h-5 rounded-full bg-gradient-to-tr ${gradClass} flex-shrink-0 flex items-center justify-center text-white text-[9px] font-bold`}>
+                                  {p.name.charAt(0).toUpperCase()}
+                                </div>
+                              ) : (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                  src={p.metadata}
+                                  alt={p.name}
+                                  className="w-5 h-5 rounded-full object-cover flex-shrink-0 border border-zinc-600"
+                                  onError={(e) => { (e.target as HTMLImageElement).src = ''; }}
+                                />
+                              )}
+                              {/* Dot hijau */}
+                              <div className="w-1.5 h-1.5 rounded-full bg-green-500 flex-shrink-0" />
+                              <span className={`text-xs truncate max-w-[90px] ${
+                                isMe ? 'text-indigo-300 font-semibold' : 'text-slate-400'
+                              }`}>
+                                {isMe ? `${p.name} (kamu)` : p.name}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
           
@@ -418,6 +536,46 @@ export default function ServerDetail() {
             </button>
           </div>
         </div>
+
+        {/* Voice Connection Bar — muncul kalau connected tapi minimize */}
+        {activeVoiceChannel && !isVoiceVisible && (
+          <div className="bg-[#232428] border-t border-[#1e1f22]/50 px-3 py-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="relative flex-shrink-0">
+                  <div className="w-2 h-2 bg-green-500 rounded-full" />
+                  <div className="w-2 h-2 bg-green-500 rounded-full absolute inset-0 animate-ping opacity-75" />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-green-400 text-[10px] font-bold uppercase tracking-wider">Suara Aktif</div>
+                  <div
+                    onClick={() => setIsVoiceVisible(true)}
+                    className="text-white text-xs font-semibold truncate max-w-[100px] cursor-pointer hover:text-indigo-400 transition flex items-center gap-1"
+                  >
+                    <Mic className="w-3 h-3 text-green-400 flex-shrink-0" />
+                    {activeVoiceChannel.name}
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-1 flex-shrink-0">
+                <button
+                  onClick={() => setIsVoiceVisible(true)}
+                  className="w-7 h-7 bg-[#2b2d31] hover:bg-indigo-600 rounded-lg flex items-center justify-center text-slate-400 hover:text-white transition"
+                  title="Buka panel suara"
+                >
+                  <Volume2 className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={() => { setActiveVoiceChannel(null); setIsVoiceVisible(false); }}
+                  className="w-7 h-7 bg-[#2b2d31] hover:bg-red-600/70 rounded-lg flex items-center justify-center text-slate-400 hover:text-red-300 transition"
+                  title="Keluar dari voice"
+                >
+                  <PhoneOff className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* 3. Panel Tengah - Area Obrolan */}
         <div className="flex-1 flex flex-col bg-[#313338]">
@@ -490,7 +648,7 @@ export default function ServerDetail() {
         </div>
       </div>
 
-      {/* 5. LiveKit Room Modal Overlay */}
+      {/* 5. LiveKit Room — selalu mounted ketika activeVoiceChannel ada, visibility dikontrol via isVisible */}
       {activeVoiceChannel && (
         <VoiceChat
           serverId={serverId}
@@ -499,7 +657,12 @@ export default function ServerDetail() {
           userEmail={currentUser?.email || 'User'}
           userDisplayName={displayName || currentUser?.email?.split('@')[0] || 'User'}
           userAvatarUrl={avatarUrl || 'preset:purple'}
-          onClose={() => setActiveVoiceChannel(null)}
+          isVisible={isVoiceVisible}
+          onMinimize={() => setIsVoiceVisible(false)}
+          onDisconnect={() => {
+            setActiveVoiceChannel(null);
+            setIsVoiceVisible(false);
+          }}
         />
       )}
 
@@ -588,6 +751,15 @@ export default function ServerDetail() {
         <ProfileModal
           onClose={() => setIsProfileModalOpen(false)}
           onProfileUpdate={() => setRefreshCount(prev => prev + 1)}
+        />
+      )}
+
+      {/* Invite Modal */}
+      {isInviteOpen && server && (
+        <InviteModal
+          serverId={server.id}
+          serverName={server.name}
+          onClose={() => setIsInviteOpen(false)}
         />
       )}
     </div>
