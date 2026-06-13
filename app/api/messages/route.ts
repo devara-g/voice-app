@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
+import { decodeMessageContent, encodeMessageContent, MessageReplyMeta } from '@/lib/messageFormat';
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -27,20 +28,31 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ messages: data ?? [] });
+  const messages = (data ?? []).map((message) => {
+    const decoded = decodeMessageContent(message.content || '');
+    return {
+      ...message,
+      content: decoded.content,
+      reply_meta: decoded.replyMeta,
+    };
+  });
+
+  return NextResponse.json({ messages });
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const { channel_id, user_id, content } = await req.json();
+    const { channel_id, user_id, content, reply_meta } = await req.json();
 
     if (!channel_id || !user_id || !content) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
+    const storedContent = encodeMessageContent(content, reply_meta || null);
+
     const { data, error } = await supabaseAdmin
       .from('messages')
-      .insert([{ channel_id, user_id, content }])
+      .insert([{ channel_id, user_id, content: storedContent }])
       .select()
       .single();
 
@@ -48,7 +60,100 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ message: data });
+    const decoded = decodeMessageContent(data.content || '');
+    return NextResponse.json({
+      message: {
+        ...data,
+        content: decoded.content,
+        reply_meta: decoded.replyMeta,
+      },
+    });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
+
+export async function PATCH(req: NextRequest) {
+  try {
+    const { message_id, user_id, content, reply_meta } = await req.json();
+
+    if (!message_id || !user_id || !content) {
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    }
+
+    const { data: existing, error: existingError } = await supabaseAdmin
+      .from('messages')
+      .select('id, user_id, content')
+      .eq('id', message_id)
+      .single();
+
+    if (existingError || !existing) {
+      return NextResponse.json({ error: 'Message not found' }, { status: 404 });
+    }
+
+    if (existing.user_id !== user_id) {
+      return NextResponse.json({ error: 'Tidak bisa mengubah pesan milik orang lain' }, { status: 403 });
+    }
+
+    const decodedExisting = decodeMessageContent(existing.content || '');
+    const storedContent = encodeMessageContent(content, reply_meta ?? decodedExisting.replyMeta);
+
+    const { data, error } = await supabaseAdmin
+      .from('messages')
+      .update({ content: storedContent })
+      .eq('id', message_id)
+      .select()
+      .single();
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    const decoded = decodeMessageContent(data.content || '');
+    return NextResponse.json({
+      message: {
+        ...data,
+        content: decoded.content,
+        reply_meta: decoded.replyMeta,
+      },
+    });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const { message_id, user_id } = await req.json();
+
+    if (!message_id || !user_id) {
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    }
+
+    const { data: existing, error: existingError } = await supabaseAdmin
+      .from('messages')
+      .select('id, user_id')
+      .eq('id', message_id)
+      .single();
+
+    if (existingError || !existing) {
+      return NextResponse.json({ error: 'Message not found' }, { status: 404 });
+    }
+
+    if (existing.user_id !== user_id) {
+      return NextResponse.json({ error: 'Tidak bisa menghapus pesan milik orang lain' }, { status: 403 });
+    }
+
+    const { error } = await supabaseAdmin
+      .from('messages')
+      .delete()
+      .eq('id', message_id);
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ ok: true });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

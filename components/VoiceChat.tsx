@@ -210,13 +210,13 @@ function ActiveVoiceRoom({
 
   const getPresetClasses = (id: string) => {
     const presets: Record<string, string> = {
-      'preset:pink': 'from-pink-500 to-rose-500',
-      'preset:purple': 'from-purple-500 to-indigo-500',
-      'preset:blue': 'from-blue-500 to-cyan-500',
-      'preset:emerald': 'from-emerald-500 to-teal-500',
-      'preset:orange': 'from-orange-500 to-amber-500',
+      'preset:pink': 'bg-pink-500',
+      'preset:purple': 'bg-purple-500',
+      'preset:blue': 'bg-blue-500',
+      'preset:emerald': 'bg-emerald-500',
+      'preset:orange': 'bg-orange-500',
     };
-    return presets[id] || 'from-purple-500 to-indigo-500';
+    return presets[id] || 'bg-purple-500';
   };
 
   return (
@@ -273,7 +273,7 @@ function ActiveVoiceRoom({
                   <div className="relative mb-3">
                     {hasPreset || !pAvatar ? (
                       <div
-                        className={`w-20 h-20 rounded-full bg-gradient-to-tr ${getPresetClasses(pAvatar || 'preset:purple')} flex items-center justify-center text-white text-2xl font-bold transition-all duration-300 ${
+                        className={`w-20 h-20 rounded-full ${getPresetClasses(pAvatar || 'preset:purple')} flex items-center justify-center text-white text-2xl font-bold transition-all duration-300 ${
                           isSpeaking
                             ? 'ring-4 ring-[#23a559] shadow-[0_0_20px_rgba(35,165,89,0.5)] scale-105'
                             : 'ring-2 ring-zinc-700'

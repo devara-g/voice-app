@@ -12,6 +12,7 @@ import UserProfileCard from '@/components/UserProfileCard';
 import ServerSettingsModal from '@/components/ServerSettingsModal';
 import TextChat from '@/components/TextChat';
 import CreateChannelModal from '@/components/CreateChannelModal';
+import EditChannelModal from '@/components/EditChannelModal';
 import { useVoice } from '@/contexts/VoiceContext';
 
 interface Server {
@@ -58,6 +59,7 @@ export default function ServerDetail() {
 
   // State untuk modal kustom saluran suara
   const [isCreateChannelOpen, setIsCreateChannelOpen] = useState(false);
+  const [isEditChannelOpen, setIsEditChannelOpen] = useState(false);
 
   // Active Text Channel state
   const [activeTextChannel, setActiveTextChannel] = useState<{ id: string; name: string } | null>(null);
@@ -266,7 +268,15 @@ export default function ServerDetail() {
       .select('*')
       .eq('server_id', serverId)
       .order('created_at', { ascending: true });
-    if (data) setChannels(data);
+    if (data) {
+      setChannels(data);
+      if (activeTextChannel) {
+        const updatedActive = data.find((channel: Channel) => channel.id === activeTextChannel.id);
+        if (updatedActive) {
+          setActiveTextChannel({ id: updatedActive.id, name: updatedActive.name });
+        }
+      }
+    }
   };
 
   const handleCreateServerSubmit = async () => {
@@ -313,22 +323,22 @@ export default function ServerDetail() {
 
   const getPresetClasses = (id: string) => {
     const presets: Record<string, string> = {
-      'preset:pink': 'from-pink-500 to-rose-500',
-      'preset:purple': 'from-purple-500 to-indigo-500',
-      'preset:blue': 'from-blue-500 to-cyan-500',
-      'preset:emerald': 'from-emerald-500 to-teal-500',
-      'preset:orange': 'from-orange-500 to-amber-500',
+      'preset:pink': 'bg-pink-500',
+      'preset:purple': 'bg-purple-500',
+      'preset:blue': 'bg-blue-500',
+      'preset:emerald': 'bg-emerald-500',
+      'preset:orange': 'bg-orange-500',
     };
-    return presets[id] || 'from-purple-500 to-indigo-500';
+    return presets[id] || 'bg-purple-500';
   };
 
   const getGradient = (name: string) => {
     const gradients = [
-      'from-pink-500 to-rose-500',
-      'from-purple-500 to-indigo-500',
-      'from-blue-500 to-cyan-500',
-      'from-emerald-500 to-teal-500',
-      'from-orange-500 to-amber-500',
+      'bg-pink-500',
+      'bg-purple-500',
+      'bg-blue-500',
+      'bg-emerald-500',
+      'bg-orange-500',
     ];
     let sum = 0;
     for (let i = 0; i < name.length; i++) {
@@ -589,16 +599,16 @@ export default function ServerDetail() {
                             <div className="pl-8 pb-1 space-y-0.5">
                               {participants.map((p) => {
                                 const presets: Record<string, string> = {
-                                  'preset:pink': 'from-pink-500 to-rose-500',
-                                  'preset:purple': 'from-purple-500 to-indigo-500',
-                                  'preset:blue': 'from-blue-500 to-cyan-500',
-                                  'preset:emerald': 'from-emerald-500 to-teal-500',
-                                  'preset:orange': 'from-orange-500 to-amber-500',
+                                  'preset:pink': 'bg-pink-500',
+                                  'preset:purple': 'bg-purple-500',
+                                  'preset:blue': 'bg-blue-500',
+                                  'preset:emerald': 'bg-emerald-500',
+                                  'preset:orange': 'bg-orange-500',
                                 };
                                 const hasPreset = p.metadata?.startsWith('preset:');
                                 const gradClass = hasPreset
-                                  ? presets[p.metadata] || 'from-purple-500 to-indigo-500'
-                                  : 'from-purple-500 to-indigo-500';
+                                  ? presets[p.metadata] || 'bg-purple-500'
+                                  : 'bg-purple-500';
                                 const isMe = currentUser?.email === p.identity;
 
                                 return (
@@ -608,7 +618,7 @@ export default function ServerDetail() {
                                   >
                                     {/* Mini avatar */}
                                     {hasPreset || !p.metadata ? (
-                                      <div className={`w-5 h-5 rounded-full bg-gradient-to-tr ${gradClass} flex-shrink-0 flex items-center justify-center text-white text-[9px] font-bold`}>
+                                      <div className={`w-5 h-5 rounded-full ${gradClass} flex-shrink-0 flex items-center justify-center text-white text-[9px] font-bold`}>
                                         {p.name.charAt(0).toUpperCase()}
                                       </div>
                                     ) : (
@@ -686,7 +696,7 @@ export default function ServerDetail() {
                   title="Edit Profil"
                 >
                   {avatarUrl?.startsWith('preset:') ? (
-                    <div className={`w-8.5 h-8.5 rounded-full bg-gradient-to-tr ${getPresetClasses(avatarUrl)} flex items-center justify-center text-white text-sm font-bold shadow-md`}>
+                    <div className={`w-8.5 h-8.5 rounded-full ${getPresetClasses(avatarUrl)} flex items-center justify-center text-white text-sm font-bold shadow-md`}>
                       {(displayName || currentUser?.email || '?').charAt(0).toUpperCase()}
                     </div>
                   ) : (
@@ -756,6 +766,16 @@ export default function ServerDetail() {
                   </span>
                 </div>
 
+                {activeTextChannel && currentUser && server?.owner_id === currentUser.id && (
+                  <button
+                    onClick={() => setIsEditChannelOpen(true)}
+                    className="mr-2 hidden items-center gap-1 rounded-lg bg-[#35373d] px-3 py-1.5 text-xs font-semibold text-slate-300 transition hover:bg-[#40424a] hover:text-white md:flex"
+                  >
+                    <Settings className="h-3.5 w-3.5" />
+                    Edit Channel
+                  </button>
+                )}
+
                 {/* Members Toggle (Mobile only) */}
                 <button
                   onClick={() => setIsRightSidebarOpen(true)}
@@ -812,7 +832,7 @@ export default function ServerDetail() {
                       {/* Avatar with online dot */}
                       <div className="relative flex-shrink-0">
                         {hasPresetAvatar ? (
-                          <div className={`w-8 h-8 rounded-full bg-gradient-to-tr ${getPresetClasses(member.avatar_url || '')} flex items-center justify-center text-white text-xs font-bold shadow-md`}>
+                          <div className={`w-8 h-8 rounded-full ${getPresetClasses(member.avatar_url || '')} flex items-center justify-center text-white text-xs font-bold shadow-md`}>
                             {member.display_name.charAt(0).toUpperCase()}
                           </div>
                         ) : member.avatar_url ? (
@@ -864,6 +884,21 @@ export default function ServerDetail() {
           serverId={serverId}
           onClose={() => setIsCreateChannelOpen(false)}
           onCreated={refreshChannels}
+        />
+      )}
+
+      {isEditChannelOpen && activeTextChannel && currentUser && server && (
+        <EditChannelModal
+          channelId={activeTextChannel.id}
+          serverId={server.id}
+          initialName={activeTextChannel.name}
+          userId={currentUser.id}
+          onClose={() => setIsEditChannelOpen(false)}
+          onUpdated={(updated) => {
+            setChannels((currentChannels) => currentChannels.map((channel) => channel.id === updated.id ? { ...channel, name: updated.name } : channel));
+            setActiveTextChannel({ id: updated.id, name: updated.name });
+            setIsEditChannelOpen(false);
+          }}
         />
       )}
 

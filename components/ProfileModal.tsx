@@ -10,11 +10,11 @@ interface ProfileModalProps {
 }
 
 const PRESET_GRADIENTS = [
-  { id: 'preset:pink', name: 'Rose Petal', classes: 'from-pink-500 to-rose-500' },
-  { id: 'preset:purple', name: 'Indigo Nights', classes: 'from-purple-500 to-indigo-500' },
-  { id: 'preset:blue', name: 'Deep Ocean', classes: 'from-blue-500 to-cyan-500' },
-  { id: 'preset:emerald', name: 'Teal Forest', classes: 'from-emerald-500 to-teal-500' },
-  { id: 'preset:orange', name: 'Sunset Glow', classes: 'from-orange-500 to-amber-500' },
+  { id: 'preset:pink', name: 'Rose Petal', classes: 'bg-pink-500' },
+  { id: 'preset:purple', name: 'Indigo Nights', classes: 'bg-purple-500' },
+  { id: 'preset:blue', name: 'Deep Ocean', classes: 'bg-blue-500' },
+  { id: 'preset:emerald', name: 'Teal Forest', classes: 'bg-emerald-500' },
+  { id: 'preset:orange', name: 'Sunset Glow', classes: 'bg-orange-500' },
 ];
 
 export default function ProfileModal({ onClose, onProfileUpdate }: ProfileModalProps) {
@@ -254,7 +254,7 @@ export default function ProfileModal({ onClose, onProfileUpdate }: ProfileModalP
               >
                 {/* Avatar */}
                 {!localPreview && isPreset(displayAvatar) ? (
-                  <div className={`w-24 h-24 rounded-full bg-gradient-to-tr ${getPresetClasses(displayAvatar)} flex items-center justify-center text-white text-4xl font-extrabold shadow-xl`}>
+                  <div className={`w-24 h-24 rounded-full ${getPresetClasses(displayAvatar)} flex items-center justify-center text-white text-4xl font-extrabold shadow-xl`}>
                     {(displayName || email || '?').charAt(0).toUpperCase()}
                   </div>
                 ) : (
@@ -411,7 +411,7 @@ export default function ProfileModal({ onClose, onProfileUpdate }: ProfileModalP
                       type="button"
                       onClick={() => { setAvatarUrl(p.id); setLocalPreview(null); }}
                       disabled={uploading}
-                      className={`w-10 h-10 rounded-full bg-gradient-to-tr ${p.classes} flex items-center justify-center text-white text-xs font-bold hover:scale-110 transition-all relative border-2 shadow-md ${selected ? 'border-white scale-110' : 'border-white/10'
+                      className={`w-10 h-10 rounded-full ${p.classes} flex items-center justify-center text-white text-xs font-bold hover:scale-110 transition-all relative border-2 shadow-md ${selected ? 'border-white scale-110' : 'border-white/10'
                         }`}
                       title={p.name}
                     >

@@ -18,11 +18,11 @@ interface UserProfileCardProps {
 }
 
 const PRESET_GRADIENTS: Record<string, string> = {
-  'preset:pink': 'from-pink-500 to-rose-500',
-  'preset:purple': 'from-purple-500 to-indigo-500',
-  'preset:blue': 'from-blue-500 to-cyan-500',
-  'preset:emerald': 'from-emerald-500 to-teal-500',
-  'preset:orange': 'from-orange-500 to-amber-500',
+  'preset:pink': 'bg-pink-500',
+  'preset:purple': 'bg-purple-500',
+  'preset:blue': 'bg-blue-500',
+  'preset:emerald': 'bg-emerald-500',
+  'preset:orange': 'bg-orange-500',
 };
 
 function getGradient(str: string): string {
@@ -41,7 +41,7 @@ export default function UserProfileCard({
   const avatarUrl = member.avatar_url;
   const isPreset = avatarUrl?.startsWith('preset:');
   const gradientClass = isPreset
-    ? PRESET_GRADIENTS[avatarUrl!] || 'from-purple-500 to-indigo-500'
+    ? PRESET_GRADIENTS[avatarUrl!] || 'bg-purple-500'
     : getGradient(member.email);
 
   const bannerGradient = gradientClass;
@@ -116,9 +116,7 @@ export default function UserProfileCard({
                     }}
                   />
                 ) : (
-                  <div
-                    className={`w-full h-full rounded-full bg-gradient-to-tr ${gradientClass} flex items-center justify-center text-white text-3xl font-extrabold`}
-                  >
+                  <div className={`w-full h-full rounded-full ${gradientClass} flex items-center justify-center text-white text-3xl font-extrabold`}>
                     {member.display_name.charAt(0).toUpperCase()}
                   </div>
                 )}

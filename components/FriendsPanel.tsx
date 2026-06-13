@@ -17,11 +17,11 @@ interface FriendsPanelProps {
 }
 
 const PRESET_GRADIENTS: Record<string, string> = {
-  'preset:pink': 'from-pink-500 to-rose-500',
-  'preset:purple': 'from-purple-500 to-indigo-500',
-  'preset:blue': 'from-blue-500 to-cyan-500',
-  'preset:emerald': 'from-emerald-500 to-teal-500',
-  'preset:orange': 'from-orange-500 to-amber-500',
+  'preset:pink': 'bg-pink-500',
+  'preset:purple': 'bg-purple-500',
+  'preset:blue': 'bg-blue-500',
+  'preset:emerald': 'bg-emerald-500',
+  'preset:orange': 'bg-orange-500',
 };
 
 function getGradient(str: string): string {
@@ -48,11 +48,11 @@ function Avatar({ user }: { user: { display_name: string; avatar_url: string | n
   }
 
   const gradientClass = avatarUrl?.startsWith('preset:')
-    ? PRESET_GRADIENTS[avatarUrl] || 'from-purple-500 to-indigo-500'
+    ? PRESET_GRADIENTS[avatarUrl] || 'bg-purple-500'
     : getGradient(user.email || user.display_name);
 
   return (
-    <div className={`w-10 h-10 rounded-full bg-gradient-to-tr ${gradientClass} flex items-center justify-center text-white text-sm font-bold shadow-md`}>
+    <div className={`w-10 h-10 rounded-full ${gradientClass} flex items-center justify-center text-white text-sm font-bold shadow-md`}>
       {user.display_name.charAt(0).toUpperCase()}
     </div>
   );

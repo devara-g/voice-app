@@ -54,3 +54,57 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
+
+export async function PATCH(req: NextRequest) {
+  try {
+    const { channel_id, user_id, name } = await req.json();
+
+    if (!channel_id || !user_id || !name) {
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    }
+
+    const { data: channel, error: channelError } = await supabaseAdmin
+      .from('channels')
+      .select('id, server_id, name')
+      .eq('id', channel_id)
+      .single();
+
+    if (channelError || !channel) {
+      return NextResponse.json({ error: 'Channel not found' }, { status: 404 });
+    }
+
+    const { data: server, error: serverError } = await supabaseAdmin
+      .from('servers')
+      .select('id, owner_id')
+      .eq('id', channel.server_id)
+      .single();
+
+    if (serverError || !server) {
+      return NextResponse.json({ error: 'Server not found' }, { status: 404 });
+    }
+
+    if (server.owner_id !== user_id) {
+      return NextResponse.json({ error: 'Hanya owner yang dapat mengubah channel' }, { status: 403 });
+    }
+
+    const cleanedName = name.trim();
+    if (!cleanedName) {
+      return NextResponse.json({ error: 'Nama channel tidak boleh kosong' }, { status: 400 });
+    }
+
+    const { data: updated, error: updateError } = await supabaseAdmin
+      .from('channels')
+      .update({ name: cleanedName })
+      .eq('id', channel_id)
+      .select('*')
+      .single();
+
+    if (updateError) {
+      return NextResponse.json({ error: updateError.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ channel: updated });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}

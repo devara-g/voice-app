@@ -2,7 +2,8 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { supabase } from '@/lib/supabaseClient';
-import { Send, Hash } from 'lucide-react';
+import { Send, Hash, Reply, PencilLine, Trash2, X, Check, CornerDownRight } from 'lucide-react';
+import { decodeMessageContent, MessageReplyMeta } from '@/lib/messageFormat';
 
 interface Message {
   id: string;
@@ -10,6 +11,7 @@ interface Message {
   user_id: string;
   content: string;
   created_at: string;
+  reply_meta?: MessageReplyMeta | null;
   user?: {
     id: string;
   };
@@ -33,7 +35,19 @@ export default function TextChat({ channelId, channelName, currentUserId }: Text
   const [profiles, setProfiles] = useState<Record<string, UserProfile>>({});
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
+  const [replyingTo, setReplyingTo] = useState<Message | null>(null);
+  const [editingMessage, setEditingMessage] = useState<Message | null>(null);
+  const [busyMessageId, setBusyMessageId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const normalizeMessage = (message: any): Message => {
+    const decoded = decodeMessageContent(message.content || '');
+    return {
+      ...message,
+      content: decoded.content,
+      reply_meta: decoded.replyMeta,
+    };
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -71,11 +85,37 @@ export default function TextChat({ channelId, channelName, currentUserId }: Text
           filter: `channel_id=eq.${channelId}`,
         },
         async (payload) => {
-          const newMessage = payload.new as Message;
-          setMessages((prev) => [...prev, newMessage]);
+          const newMessage = normalizeMessage(payload.new);
+          setMessages((prev) => prev.some((message) => message.id === newMessage.id) ? prev : [...prev, newMessage]);
           // Fetch profile for the new message
           await fetchProfiles([newMessage.user_id]);
           scrollToBottom();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'messages',
+          filter: `channel_id=eq.${channelId}`,
+        },
+        (payload) => {
+          const updatedMessage = normalizeMessage(payload.new);
+          setMessages((prev) => prev.map((message) => message.id === updatedMessage.id ? updatedMessage : message));
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'messages',
+          filter: `channel_id=eq.${channelId}`,
+        },
+        (payload) => {
+          const deletedMessage = payload.old as Message;
+          setMessages((prev) => prev.filter((message) => message.id !== deletedMessage.id));
         }
       )
       .subscribe();
@@ -86,7 +126,7 @@ export default function TextChat({ channelId, channelName, currentUserId }: Text
         const res = await fetch(`/api/messages?channel_id=${channelId}`);
         if (res.ok) {
           const data = await res.json();
-          setMessages(data.messages || []);
+          setMessages((data.messages || []).map(normalizeMessage));
 
           // Get unique user IDs to fetch profiles
           const uniqueUserIds = Array.from(new Set(data.messages.map((m: Message) => m.user_id)));
@@ -117,9 +157,42 @@ export default function TextChat({ channelId, channelName, currentUserId }: Text
     if (!newMessage.trim()) return;
 
     const content = newMessage.trim();
-    setNewMessage(''); // optimistic clear
+    const replyMeta = replyingTo
+      ? {
+          messageId: replyingTo.id,
+          displayName: profiles[replyingTo.user_id]?.display_name || 'Unknown',
+          content: replyingTo.content,
+          avatarUrl: profiles[replyingTo.user_id]?.avatar_url || null,
+          userId: replyingTo.user_id,
+          createdAt: replyingTo.created_at,
+        }
+      : null;
+    const editTarget = editingMessage;
+    setNewMessage('');
+    setReplyingTo(null);
+    setEditingMessage(null);
 
     try {
+      if (editTarget) {
+        const editResponse = await fetch('/api/messages', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message_id: editTarget.id,
+            user_id: currentUserId,
+            content,
+            reply_meta: editTarget.reply_meta || null,
+          }),
+        });
+
+        if (editResponse.ok) {
+          const edited = await editResponse.json();
+          const updatedMessage = normalizeMessage(edited.message);
+          setMessages((prev) => prev.map((message) => message.id === updatedMessage.id ? updatedMessage : message));
+        }
+        return;
+      }
+
       const res = await fetch('/api/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -127,22 +200,68 @@ export default function TextChat({ channelId, channelName, currentUserId }: Text
           channel_id: channelId,
           user_id: currentUserId,
           content,
+          reply_meta: replyMeta,
         }),
       });
+
       if (!res.ok) {
         console.error('Failed to send message');
+      } else {
+        const data = await res.json();
+        const created = normalizeMessage(data.message);
+        setMessages((prev) => [...prev, created]);
+        await fetchProfiles([created.user_id]);
+        scrollToBottom();
       }
     } catch (err) {
       console.error('Error sending message', err);
     }
   };
 
+  const handleReply = (message: Message) => {
+    setReplyingTo(message);
+    setEditingMessage(null);
+    setNewMessage('');
+  };
+
+  const handleEdit = (message: Message) => {
+    setEditingMessage(message);
+    setReplyingTo(null);
+    setNewMessage(message.content);
+  };
+
+  const handleDelete = async (message: Message) => {
+    if (!window.confirm('Hapus pesan ini?')) return;
+    setBusyMessageId(message.id);
+
+    try {
+      const res = await fetch('/api/messages', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message_id: message.id, user_id: currentUserId }),
+      });
+
+      if (res.ok) {
+        setMessages((prev) => prev.filter((item) => item.id !== message.id));
+        if (editingMessage?.id === message.id) {
+          setEditingMessage(null);
+          setNewMessage('');
+        }
+        if (replyingTo?.id === message.id) {
+          setReplyingTo(null);
+        }
+      }
+    } finally {
+      setBusyMessageId(null);
+    }
+  };
+
   const PRESET_GRADIENTS: Record<string, string> = {
-    'preset:pink': 'from-pink-500 to-rose-500',
-    'preset:purple': 'from-purple-500 to-indigo-500',
-    'preset:blue': 'from-blue-500 to-cyan-500',
-    'preset:emerald': 'from-emerald-500 to-teal-500',
-    'preset:orange': 'from-orange-500 to-amber-500',
+    'preset:pink': 'bg-pink-500',
+    'preset:purple': 'bg-purple-500',
+    'preset:blue': 'bg-blue-500',
+    'preset:emerald': 'bg-emerald-500',
+    'preset:orange': 'bg-orange-500',
   };
 
   const getGradient = (name: string) => {
@@ -151,6 +270,8 @@ export default function TextChat({ channelId, channelName, currentUserId }: Text
     for (let i = 0; i < name.length; i++) sum += name.charCodeAt(i);
     return gradients[sum % gradients.length];
   };
+
+  const canManageMessage = (message: Message) => message.user_id === currentUserId;
 
   return (
     <div className="flex-1 flex min-h-0 flex-col bg-[#313338] relative overflow-hidden">
@@ -186,12 +307,43 @@ export default function TextChat({ channelId, channelName, currentUserId }: Text
                 return (
                   <div
                     key={msg.id}
-                    className={`group flex gap-3 rounded-2xl px-3 py-2.5 transition-colors hover:bg-white/[0.025] ${isConsecutive ? 'mt-0' : 'mt-2'}`}
+                    className={`group relative flex gap-3 rounded-2xl px-3 py-2.5 pr-16 transition-colors hover:bg-white/[0.025] ${isConsecutive ? 'mt-0' : 'mt-2'}`}
                   >
+                    <div className="absolute right-2 top-2 flex items-center gap-1 opacity-0 transition group-hover:opacity-100">
+                      <button
+                        type="button"
+                        onClick={() => handleReply(msg)}
+                        className="flex h-7 w-7 items-center justify-center rounded-lg text-zinc-400 hover:bg-white/5 hover:text-white"
+                        title="Reply"
+                      >
+                        <Reply className="h-4 w-4" />
+                      </button>
+                      {canManageMessage(msg) && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => handleEdit(msg)}
+                            className="flex h-7 w-7 items-center justify-center rounded-lg text-zinc-400 hover:bg-white/5 hover:text-white"
+                            title="Edit"
+                          >
+                            <PencilLine className="h-4 w-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(msg)}
+                            disabled={busyMessageId === msg.id}
+                            className="flex h-7 w-7 items-center justify-center rounded-lg text-zinc-400 hover:bg-rose-500/10 hover:text-rose-300 disabled:opacity-50"
+                            title="Hapus"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </>
+                      )}
+                    </div>
                     {!isConsecutive ? (
                       <div className="flex-shrink-0 pt-0.5">
                         {isPreset || !avatarUrl ? (
-                          <div className={`w-10 h-10 rounded-full bg-gradient-to-tr ${isPreset ? PRESET_GRADIENTS[avatarUrl || ''] || getGradient(displayName) : getGradient(displayName)} flex items-center justify-center text-white font-bold shadow-lg shadow-black/10`}>
+                          <div className={`w-10 h-10 rounded-full ${isPreset ? PRESET_GRADIENTS[avatarUrl || ''] || getGradient(displayName) : getGradient(displayName)} flex items-center justify-center text-white font-bold shadow-lg shadow-black/10`}>
                             {displayName.charAt(0).toUpperCase()}
                           </div>
                         ) : (
@@ -213,6 +365,17 @@ export default function TextChat({ channelId, channelName, currentUserId }: Text
                           </span>
                         </div>
                       )}
+                      {msg.reply_meta && (
+                        <div className="mt-1 mb-2 rounded-xl border border-indigo-500/20 bg-indigo-500/10 px-3 py-2 text-sm text-zinc-200">
+                          <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-indigo-300">
+                            <CornerDownRight className="h-3.5 w-3.5" />
+                            Balasan ke {msg.reply_meta.displayName}
+                          </div>
+                          <div className="mt-1 line-clamp-2 text-xs text-zinc-300/90">
+                            {msg.reply_meta.content}
+                          </div>
+                        </div>
+                      )}
                       <div className="mt-0.5 text-[15px] leading-6 text-zinc-200 whitespace-pre-wrap break-words">
                         {msg.content}
                       </div>
@@ -229,21 +392,47 @@ export default function TextChat({ channelId, channelName, currentUserId }: Text
       {/* Input Area */}
       <div className="flex-shrink-0 border-t border-white/5 bg-[#313338]/95 px-4 py-4 backdrop-blur-sm">
         <form onSubmit={handleSendMessage} className="relative mx-auto flex w-full max-w-3xl items-center pl-4 md:pl-10 lg:pl-16">
-          <div className="flex w-full items-center rounded-2xl border border-white/8 bg-[#383a40] shadow-[0_8px_24px_rgba(0,0,0,0.18)] focus-within:border-indigo-500/40 focus-within:ring-2 focus-within:ring-indigo-500/15 transition">
-            <input
-              type="text"
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              placeholder={`Kirim pesan ke #${channelName}`}
-              className="w-full bg-transparent px-4 py-3.5 text-zinc-100 placeholder-zinc-500 outline-none"
-            />
-            <button
-              type="submit"
-              disabled={!newMessage.trim()}
-              className="mr-2 flex h-9 w-9 items-center justify-center rounded-xl text-zinc-400 transition hover:bg-white/5 hover:text-white disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-zinc-400"
-            >
-              <Send className="h-5 w-5" />
-            </button>
+          <div className="flex w-full flex-col gap-2">
+            {(replyingTo || editingMessage) && (
+              <div className="flex items-center justify-between rounded-2xl border border-indigo-500/15 bg-indigo-500/10 px-4 py-3 text-sm text-zinc-200">
+                <div className="min-w-0">
+                  <div className="text-[11px] font-semibold uppercase tracking-wider text-indigo-300">
+                    {editingMessage ? 'Mengedit pesan' : `Membalas ${profiles[replyingTo?.user_id || '']?.display_name || 'pesan'}`}
+                  </div>
+                  <div className="truncate text-xs text-zinc-300/80">
+                    {editingMessage ? editingMessage.content : replyingTo?.content}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setReplyingTo(null);
+                    setEditingMessage(null);
+                    setNewMessage('');
+                  }}
+                  className="ml-3 flex h-8 w-8 items-center justify-center rounded-lg text-zinc-400 hover:bg-white/5 hover:text-white"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            )}
+
+            <div className="flex w-full items-center rounded-2xl border border-white/8 bg-[#383a40] shadow-[0_8px_24px_rgba(0,0,0,0.18)] focus-within:border-indigo-500/40 focus-within:ring-2 focus-within:ring-indigo-500/15 transition">
+              <input
+                type="text"
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                placeholder={editingMessage ? 'Ubah pesan Anda' : `Kirim pesan ke #${channelName}`}
+                className="w-full bg-transparent px-4 py-3.5 text-zinc-100 placeholder-zinc-500 outline-none"
+              />
+              <button
+                type="submit"
+                disabled={!newMessage.trim()}
+                className="mr-2 flex h-9 w-9 items-center justify-center rounded-xl text-zinc-400 transition hover:bg-white/5 hover:text-white disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-zinc-400"
+              >
+                {editingMessage ? <Check className="h-5 w-5" /> : <Send className="h-5 w-5" />}
+              </button>
+            </div>
           </div>
         </form>
       </div>

@@ -161,22 +161,22 @@ export default function Dashboard() {
 
   const getPresetClasses = (id: string) => {
     const presets: Record<string, string> = {
-      'preset:pink': 'from-pink-500 to-rose-500',
-      'preset:purple': 'from-purple-500 to-indigo-500',
-      'preset:blue': 'from-blue-500 to-cyan-500',
-      'preset:emerald': 'from-emerald-500 to-teal-500',
-      'preset:orange': 'from-orange-500 to-amber-500',
+      'preset:pink': 'bg-pink-500',
+      'preset:purple': 'bg-purple-500',
+      'preset:blue': 'bg-blue-500',
+      'preset:emerald': 'bg-emerald-500',
+      'preset:orange': 'bg-orange-500',
     };
-    return presets[id] || 'from-purple-500 to-indigo-500';
+    return presets[id] || 'bg-purple-500';
   };
 
   const getGradient = (name: string) => {
     const gradients = [
-      'from-pink-500 to-rose-500',
-      'from-purple-500 to-indigo-500',
-      'from-blue-500 to-cyan-500',
-      'from-emerald-500 to-teal-500',
-      'from-orange-500 to-amber-500',
+      'bg-pink-500',
+      'bg-purple-500',
+      'bg-blue-500',
+      'bg-emerald-500',
+      'bg-orange-500',
     ];
     let sum = 0;
     for (let i = 0; i < name.length; i++) {
