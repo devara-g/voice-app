@@ -15,42 +15,36 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing Supabase keys' }, { status: 500 });
     }
 
-    // Inisialisasi client Supabase dengan schema 'auth' menggunakan service role key
+    // Inisialisasi client Supabase
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
       auth: {
         autoRefreshToken: false,
         persistSession: false,
       },
-      db: {
-        schema: 'auth',
-      },
     });
 
-    const { data, error } = await supabaseAdmin
-      .from('users')
-      .select('id, email, raw_user_meta_data')
-      .in('id', userIds);
-
-    if (error) {
-      console.error('Error fetching users from auth schema:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
     const emails: Record<string, string> = {};
-    const profiles: Record<string, { email: string; display_name: string; avatar_url: string | null; bio: string | null }> = {};
+    const profiles: Record<string, { email: string; display_name: string; avatar_url: string | null; banner_url?: string | null; bio: string | null }> = {};
     
-    const userData = data as { id: string; email?: string; raw_user_meta_data?: any }[] | null;
-    userData?.forEach((user) => {
-      if (user.email) {
-        emails[user.id] = user.email;
+    // Fetch user details for each ID
+    const promises = userIds.map((id: string) => supabaseAdmin.auth.admin.getUserById(id));
+    const results = await Promise.all(promises);
+
+    results.forEach((res) => {
+      if (!res.error && res.data?.user) {
+        const user = res.data.user;
+        if (user.email) {
+          emails[user.id] = user.email;
+        }
+        const meta = user.user_metadata || {};
+        profiles[user.id] = {
+          email: user.email || 'Unknown',
+          display_name: meta.display_name || user.email?.split('@')[0] || 'Unknown',
+          avatar_url: meta.avatar_url || null,
+          banner_url: meta.banner_url || null,
+          bio: meta.bio || null,
+        };
       }
-      const meta = user.raw_user_meta_data || {};
-      profiles[user.id] = {
-        email: user.email || 'Unknown',
-        display_name: meta.display_name || user.email?.split('@')[0] || 'Unknown',
-        avatar_url: meta.avatar_url || null,
-        bio: meta.bio || null,
-      };
     });
 
     return NextResponse.json({ emails, profiles });

@@ -226,9 +226,19 @@ export default function Dashboard() {
             {/* Pill Indicator */}
             <div className="absolute left-0 w-1 bg-white rounded-r-md transition-all duration-200 origin-left scale-y-0 group-hover:scale-y-[0.6] group-active:scale-y-[1] h-8" />
             
-            <div className={`w-12 h-12 bg-[#2b2d31] rounded-2xl hover:rounded-xl transition-all flex items-center justify-center text-white font-bold hover:bg-gradient-to-tr ${getHoverGradient(server.name)} shadow-md`}>
-              {server.name.charAt(0).toUpperCase()}
-            </div>
+            {server.image_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={server.image_url}
+                alt={server.name}
+                className="w-12 h-12 rounded-2xl hover:rounded-xl transition-all object-cover shadow-md border border-white/10"
+                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+              />
+            ) : (
+              <div className={`w-12 h-12 bg-[#2b2d31] rounded-2xl hover:rounded-xl transition-all flex items-center justify-center text-white font-bold hover:bg-gradient-to-tr ${getHoverGradient(server.name)} shadow-md`}>
+                {server.name.charAt(0).toUpperCase()}
+              </div>
+            )}
             
             {/* Tooltip */}
             <div className="absolute left-full ml-3 px-2 py-1 bg-black text-white text-xs font-semibold rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-30 shadow-lg">
@@ -418,11 +428,24 @@ export default function Dashboard() {
                   key={server.id}
                   className="bg-[#2b2d31] rounded-2xl overflow-hidden cursor-pointer border border-[#35373d]/50 hover:border-slate-700 hover:shadow-xl transition-all duration-300 hover:scale-[1.02] flex flex-col group relative"
                 >
-                  {/* Bagian Atas - Gradien Warna */}
+                  {/* Bagian Atas - Banner/Gambar atau Gradien Warna */}
                   <div
                     onClick={() => router.push(`/server/${server.id}`)}
-                    className={`h-24 bg-gradient-to-tr ${getGradient(server.name)} relative flex items-end p-4`}
+                    className={`h-24 relative flex items-end p-4 overflow-hidden ${
+                      !server.image_url ? `bg-gradient-to-tr ${getGradient(server.name)}` : 'bg-[#1e1f22]'
+                    }`}
                   >
+                    {/* Background image jika ada */}
+                    {server.image_url && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={server.image_url}
+                        alt={server.name}
+                        className="absolute inset-0 w-full h-full object-cover"
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                      />
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
                     <div className="absolute top-4 right-4 bg-black/35 backdrop-blur-md px-2 py-1 rounded-md text-[10px] text-white uppercase tracking-wider font-bold border border-white/5">
                       Server
                     </div>
@@ -434,9 +457,20 @@ export default function Dashboard() {
                       onClick={() => router.push(`/server/${server.id}`)}
                       className="flex gap-4 items-center"
                     >
-                      <div className={`w-12 h-12 bg-gradient-to-tr ${getGradient(server.name)} rounded-2xl flex items-center justify-center text-white text-xl font-bold shadow-lg`}>
-                        {server.name.charAt(0).toUpperCase()}
-                      </div>
+                      {/* Ikon server: foto jika ada, fallback ke inisial */}
+                      {server.image_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={server.image_url}
+                          alt={server.name}
+                          className="w-12 h-12 rounded-2xl object-cover shadow-lg border border-white/10 flex-shrink-0"
+                          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                        />
+                      ) : (
+                        <div className={`w-12 h-12 bg-gradient-to-tr ${getGradient(server.name)} rounded-2xl flex items-center justify-center text-white text-xl font-bold shadow-lg flex-shrink-0`}>
+                          {server.name.charAt(0).toUpperCase()}
+                        </div>
+                      )}
                       <div className="flex-1 min-w-0">
                         <h3 className="text-white font-bold text-base truncate group-hover:text-indigo-400 transition">{server.name}</h3>
                         <p className="text-slate-400 text-xs mt-0.5">Voice channels ready</p>

@@ -4,16 +4,19 @@ import { supabase } from '@/lib/supabaseClient';
 import { useRouter, useParams } from 'next/navigation';
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { User } from '@supabase/supabase-js';
-import { Plus, Compass, Users, Volume2, ChevronRight, LogOut as LeaveIcon, Link, Mic, PhoneOff, Menu } from 'lucide-react';
+import { Plus, Compass, Users, Volume2, ChevronRight, LogOut as LeaveIcon, Link, Mic, PhoneOff, Menu, Settings } from 'lucide-react';
 import ProfileModal from '@/components/ProfileModal';
 import JoinServerModal from '@/components/JoinServerModal';
 import InviteModal from '@/components/InviteModal';
+import UserProfileCard from '@/components/UserProfileCard';
+import ServerSettingsModal from '@/components/ServerSettingsModal';
 import { useVoice } from '@/contexts/VoiceContext';
 
 interface Server {
   id: string;
   name: string;
   image_url: string | null;
+  banner_url?: string | null;
   owner_id: string;
 }
 
@@ -28,6 +31,7 @@ interface Member {
   email: string;
   display_name: string;
   avatar_url: string | null;
+  banner_url?: string | null;
   bio: string | null;
 }
 
@@ -71,6 +75,12 @@ export default function ServerDetail() {
   const [isJoinServerOpen, setIsJoinServerOpen] = useState(false);
   const [isLeftSidebarOpen, setIsLeftSidebarOpen] = useState(false);
   const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(false);
+
+  // State untuk lihat profil member
+  const [selectedMember, setSelectedMember] = useState<Member | null>(null);
+
+  // State untuk server settings modal
+  const [isServerSettingsOpen, setIsServerSettingsOpen] = useState(false);
 
   // State untuk peserta di tiap voice channel (realtime polling)
   const [channelParticipants, setChannelParticipants] = useState<Record<string, { identity: string; name: string; metadata: string }[]>>({});
@@ -214,6 +224,7 @@ export default function ServerDetail() {
             email: profile?.email || emailMap[member.user_id] || 'Unknown',
             display_name: profile?.display_name || emailMap[member.user_id]?.split('@')[0] || 'Unknown',
             avatar_url: profile?.avatar_url || null,
+            banner_url: (profile as any)?.banner_url || null,
             bio: profile?.bio || null,
           };
         });
@@ -387,13 +398,23 @@ export default function ServerDetail() {
                 isActive ? 'scale-y-100 h-10' : 'scale-y-0 group-hover:scale-y-[0.6] h-8'
               }`} />
               
-              <div className={`w-12 h-12 rounded-2xl hover:rounded-xl transition-all flex items-center justify-center text-white font-bold shadow-md ${
-                isActive 
-                  ? `bg-gradient-to-tr ${getGradient(s.name)} rounded-xl` 
-                  : `bg-[#2b2d31] hover:bg-gradient-to-tr ${getHoverGradient(s.name)}`
-              }`}>
-                {s.name.charAt(0).toUpperCase()}
-              </div>
+              {s.image_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={s.image_url}
+                  alt={s.name}
+                  className={`w-12 h-12 rounded-2xl hover:rounded-xl transition-all object-cover shadow-md border ${isActive ? 'border-white/30 rounded-xl' : 'border-white/10'}`}
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                />
+              ) : (
+                <div className={`w-12 h-12 rounded-2xl hover:rounded-xl transition-all flex items-center justify-center text-white font-bold shadow-md ${
+                  isActive 
+                    ? `bg-gradient-to-tr ${getGradient(s.name)} rounded-xl` 
+                    : `bg-[#2b2d31] hover:bg-gradient-to-tr ${getHoverGradient(s.name)}`
+                }`}>
+                  {s.name.charAt(0).toUpperCase()}
+                </div>
+              )}
               
               {/* Tooltip */}
               <div className="absolute left-full ml-3 px-2 py-1 bg-black text-white text-xs font-semibold rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-30 shadow-lg">
@@ -445,16 +466,41 @@ export default function ServerDetail() {
           </div>
         ) : (
           <>
+            {/* Server Banner */}
+            {server?.banner_url && (
+              <div className="relative w-full h-16 flex-shrink-0 overflow-hidden">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={server.banner_url}
+                  alt="Server Banner"
+                  className="w-full h-full object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-b from-transparent to-[#2b2d31]/80" />
+              </div>
+            )}
+
             {/* Header Server Name */}
-            <div className="h-14 flex items-center justify-between px-4 border-b border-[#1e1f22] shadow-sm bg-[#2b2d31]/80 backdrop-blur-md">
-              <h2 className="text-white font-extrabold text-sm truncate uppercase tracking-wider">{server?.name}</h2>
-              <button
-                onClick={() => setIsInviteOpen(true)}
-                className="w-7 h-7 bg-[#35373d] hover:bg-indigo-600 rounded-lg flex items-center justify-center text-slate-400 hover:text-white transition flex-shrink-0"
-                title="Undang teman"
-              >
-                <Link className="w-3.5 h-3.5" />
-              </button>
+            <div className="h-14 flex items-center justify-between px-4 border-b border-[#1e1f22] shadow-sm bg-[#2b2d31]/80 backdrop-blur-md flex-shrink-0">
+              <h2 className="text-white font-extrabold text-sm truncate uppercase tracking-wider flex-1 min-w-0">{server?.name}</h2>
+              <div className="flex items-center gap-1 flex-shrink-0">
+                {/* Server Settings — only owner */}
+                {currentUser && server?.owner_id === currentUser.id && (
+                  <button
+                    onClick={() => setIsServerSettingsOpen(true)}
+                    className="w-7 h-7 bg-[#35373d] hover:bg-zinc-600 rounded-lg flex items-center justify-center text-slate-400 hover:text-white transition"
+                    title="Pengaturan Server"
+                  >
+                    <Settings className="w-3.5 h-3.5" />
+                  </button>
+                )}
+                <button
+                  onClick={() => setIsInviteOpen(true)}
+                  className="w-7 h-7 bg-[#35373d] hover:bg-indigo-600 rounded-lg flex items-center justify-center text-slate-400 hover:text-white transition"
+                  title="Undang teman"
+                >
+                  <Link className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
             
             {/* Saluran Suara */}
@@ -699,36 +745,52 @@ export default function ServerDetail() {
             <div className="p-3 overflow-y-auto space-y-1 flex-1">
               {members.map((member) => {
                 const isLocal = currentUser?.id === member.user_id;
+                const isServerOwner = server?.owner_id === member.user_id;
                 const hasPresetAvatar = member.avatar_url?.startsWith('preset:');
                 
                 return (
                   <div 
                     key={member.user_id} 
-                    className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-[#35373d] transition cursor-pointer group"
-                    title={member.bio || undefined}
+                    className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-[#35373d] transition cursor-pointer group relative"
+                    onClick={() => setSelectedMember(member)}
+                    title={`Lihat profil ${member.display_name}`}
                   >
-                    {hasPresetAvatar ? (
-                      <div className={`w-8 h-8 rounded-full bg-gradient-to-tr ${getPresetClasses(member.avatar_url || '')} flex items-center justify-center text-white text-xs font-bold shadow-md`}>
-                        {member.display_name.charAt(0).toUpperCase()}
+                    {/* Avatar with online dot */}
+                    <div className="relative flex-shrink-0">
+                      {hasPresetAvatar ? (
+                        <div className={`w-8 h-8 rounded-full bg-gradient-to-tr ${getPresetClasses(member.avatar_url || '')} flex items-center justify-center text-white text-xs font-bold shadow-md`}>
+                          {member.display_name.charAt(0).toUpperCase()}
+                        </div>
+                      ) : member.avatar_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img 
+                          src={member.avatar_url} 
+                          alt={member.display_name} 
+                          className="w-8 h-8 rounded-full object-cover border border-zinc-700 shadow-sm"
+                          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                        />
+                      ) : (
+                        <div className={`w-8 h-8 rounded-full bg-gradient-to-tr ${getGradient(member.email)} flex items-center justify-center text-white text-xs font-bold shadow-md`}>
+                          {member.display_name.charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                      {/* Online dot — show for current user only */}
+                      {isLocal && (
+                        <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-[#2b2d31]" />
+                      )}
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1">
+                        <span className="text-slate-300 text-sm font-semibold truncate max-w-[100px] group-hover:text-white transition">
+                          {member.display_name}
+                        </span>
+                        {isServerOwner && (
+                          <span className="text-amber-400 text-[10px]" title="Server Owner">👑</span>
+                        )}
                       </div>
-                    ) : member.avatar_url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img 
-                        src={member.avatar_url} 
-                        alt={member.display_name} 
-                        className="w-8 h-8 rounded-full object-cover border border-zinc-700 shadow-sm"
-                      />
-                    ) : (
-                      <div className={`w-8 h-8 rounded-full bg-gradient-to-tr ${getGradient(member.email)} flex items-center justify-center text-white text-xs font-bold shadow-md`}>
-                        {member.display_name.charAt(0).toUpperCase()}
-                      </div>
-                    )}
-                    <div className="min-w-0">
-                      <span className="text-slate-300 text-sm font-semibold truncate block max-w-[120px]">
-                        {member.display_name}
-                      </span>
                       <span className="text-slate-500 text-[10px] block mt-0.5 uppercase tracking-wider font-semibold">
-                        {isLocal ? 'Kamu' : 'Anggota'}
+                        {isLocal ? '● Online' : 'Anggota'}
                       </span>
                     </div>
                   </div>
@@ -847,6 +909,32 @@ export default function ServerDetail() {
           onJoined={(serverId) => {
             setIsJoinServerOpen(false);
             router.push(`/server/${serverId}`);
+          }}
+        />
+      )}
+
+      {/* User Profile Card */}
+      {selectedMember && (
+        <UserProfileCard
+          member={selectedMember}
+          isOwner={server?.owner_id === selectedMember.user_id}
+          isCurrentUser={currentUser?.id === selectedMember.user_id}
+          onClose={() => setSelectedMember(null)}
+        />
+      )}
+
+      {/* Server Settings Modal */}
+      {isServerSettingsOpen && server && currentUser && (
+        <ServerSettingsModal
+          serverId={server.id}
+          serverName={server.name}
+          serverImageUrl={server.image_url}
+          serverBannerUrl={server.banner_url}
+          userId={currentUser.id}
+          onClose={() => setIsServerSettingsOpen(false)}
+          onUpdated={(updated) => {
+            setServer((prev) => prev ? { ...prev, ...updated } : prev);
+            setIsServerSettingsOpen(false);
           }}
         />
       )}

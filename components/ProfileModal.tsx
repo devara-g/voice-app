@@ -21,6 +21,7 @@ export default function ProfileModal({ onClose, onProfileUpdate }: ProfileModalP
   const [displayName, setDisplayName] = useState('');
   const [bio, setBio] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
+  const [bannerUrl, setBannerUrl] = useState('');
   const [email, setEmail] = useState('');
   const [userId, setUserId] = useState('');
 
@@ -28,12 +29,16 @@ export default function ProfileModal({ onClose, onProfileUpdate }: ProfileModalP
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [bannerUploading, setBannerUploading] = useState(false);
+  const [bannerUploadProgress, setBannerUploadProgress] = useState(0);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // Local preview sebelum upload selesai
   const [localPreview, setLocalPreview] = useState<string | null>(null);
+  const [bannerLocalPreview, setBannerLocalPreview] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const bannerFileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -47,6 +52,7 @@ export default function ProfileModal({ onClose, onProfileUpdate }: ProfileModalP
           setDisplayName(metadata.display_name || user.email?.split('@')[0] || '');
           setBio(metadata.bio || '');
           setAvatarUrl(metadata.avatar_url || 'preset:purple');
+          setBannerUrl(metadata.banner_url || '');
         }
       } catch (err) {
         console.error('Error fetching user for profile:', err);
@@ -120,6 +126,67 @@ export default function ProfileModal({ onClose, onProfileUpdate }: ProfileModalP
     }
   };
 
+  const handleBannerSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validasi client-side
+    const allowed = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
+    if (!allowed.includes(file.type)) {
+      setMessage({ type: 'error', text: 'Format tidak didukung. Gunakan JPG, PNG, WebP, atau GIF.' });
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setMessage({ type: 'error', text: 'File terlalu besar. Maksimal 5MB.' });
+      return;
+    }
+
+    // Tampilkan preview lokal langsung
+    const objectUrl = URL.createObjectURL(file);
+    setBannerLocalPreview(objectUrl);
+    setMessage(null);
+
+    // Upload ke server
+    setBannerUploading(true);
+    setBannerUploadProgress(0);
+
+    const progressInterval = setInterval(() => {
+      setBannerUploadProgress((p) => Math.min(p + 15, 85));
+    }, 150);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('userId', userId);
+
+      const res = await fetch('/api/upload/avatar', {
+        method: 'POST',
+        body: formData,
+      });
+
+      clearInterval(progressInterval);
+      setBannerUploadProgress(100);
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Upload gagal');
+      }
+
+      const { url } = await res.json();
+      setBannerUrl(url);
+      setBannerLocalPreview(null);
+      setMessage({ type: 'success', text: 'Banner berhasil diupload!' });
+    } catch (err) {
+      clearInterval(progressInterval);
+      setBannerLocalPreview(null);
+      setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Gagal mengupload banner.' });
+    } finally {
+      setBannerUploading(false);
+      setBannerUploadProgress(0);
+      if (bannerFileInputRef.current) bannerFileInputRef.current.value = '';
+    }
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (uploading) return;
@@ -132,6 +199,7 @@ export default function ProfileModal({ onClose, onProfileUpdate }: ProfileModalP
           display_name: displayName.trim(),
           bio: bio.trim(),
           avatar_url: avatarUrl,
+          banner_url: bannerUrl.trim() || null,
         },
       });
 
@@ -154,6 +222,7 @@ export default function ProfileModal({ onClose, onProfileUpdate }: ProfileModalP
   const isPreset = (url: string) => url.startsWith('preset:');
 
   const displayAvatar = localPreview || avatarUrl;
+  const displayBanner = bannerLocalPreview || bannerUrl;
 
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 font-sans">
@@ -253,10 +322,81 @@ export default function ProfileModal({ onClose, onProfileUpdate }: ProfileModalP
                 {uploading ? (
                   <><Loader2 className="w-3.5 h-3.5 animate-spin" />Mengupload...</>
                 ) : (
-                  <><Upload className="w-3.5 h-3.5" />Upload dari Galeri</>
+                  <><Upload className="w-3.5 h-3.5" />Upload Avatar Baru</>
                 )}
               </button>
               <span className="text-[10px] text-zinc-500">JPG, PNG, WebP, GIF · Maks 5MB</span>
+            </div>
+
+            {/* Banner Upload */}
+            <div className="flex flex-col">
+              <label className="block text-zinc-400 text-[10px] font-bold tracking-wider uppercase mb-2 text-center">
+                Banner Profil
+              </label>
+              
+              <div 
+                className={`relative w-full h-32 rounded-xl border-2 ${displayBanner ? 'border-zinc-700' : 'border-dashed border-zinc-700'} overflow-hidden group cursor-pointer bg-zinc-900/50 mb-2 flex items-center justify-center`}
+                onClick={() => !bannerUploading && bannerFileInputRef.current?.click()}
+              >
+                {displayBanner ? (
+                  <img 
+                    src={displayBanner} 
+                    alt="Preview Banner" 
+                    className="absolute inset-0 w-full h-full object-cover" 
+                  />
+                ) : (
+                  <div className="text-zinc-500 flex flex-col items-center gap-2">
+                    <ImageIcon className="w-8 h-8 opacity-50" />
+                    <span className="text-xs font-semibold">Klik untuk memilih banner</span>
+                  </div>
+                )}
+                
+                {/* Overlay Banner Upload */}
+                <div className={`absolute inset-0 flex flex-col items-center justify-center transition-all duration-200 ${
+                  bannerUploading ? 'bg-black/70' : 'bg-black/0 group-hover:bg-black/60'
+                }`}>
+                  {bannerUploading ? (
+                    <div className="flex flex-col items-center gap-2">
+                      <Loader2 className="w-6 h-6 text-white animate-spin" />
+                      <div className="w-32 bg-zinc-800 rounded-full h-2 overflow-hidden mt-1">
+                        <div className="bg-indigo-500 h-full transition-all duration-200" style={{ width: `${bannerUploadProgress}%` }} />
+                      </div>
+                      <span className="text-white text-[10px] font-bold mt-1">{bannerUploadProgress}%</span>
+                    </div>
+                  ) : displayBanner ? (
+                    <div className="opacity-0 group-hover:opacity-100 transition flex items-center gap-2 bg-black/60 px-3 py-1.5 rounded-lg border border-white/20">
+                      <Camera className="w-4 h-4 text-white" />
+                      <span className="text-white text-xs font-bold">Ganti Banner</span>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+
+              <input
+                ref={bannerFileInputRef}
+                type="file"
+                accept="image/jpeg,image/jpg,image/png,image/webp,image/gif"
+                className="hidden"
+                onChange={handleBannerSelect}
+                disabled={bannerUploading}
+              />
+              
+              <div className="flex justify-between items-center px-1">
+                <span className="text-[10px] text-zinc-500">JPG, PNG, WebP, GIF · Maks 5MB</span>
+                {displayBanner && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setBannerUrl('');
+                      setBannerLocalPreview(null);
+                    }}
+                    className="text-[10px] text-rose-400 hover:text-rose-300 font-bold"
+                  >
+                    Hapus Banner
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Preset Gradients */}
@@ -349,14 +489,14 @@ export default function ProfileModal({ onClose, onProfileUpdate }: ProfileModalP
             <div>
               <label className="block text-zinc-500 text-[10px] font-bold tracking-wider uppercase mb-1.5 flex items-center gap-1.5">
                 <ImageIcon className="w-3 h-3" />
-                Atau gunakan URL gambar langsung
+                URL Avatar Profil (Opsional)
               </label>
               <input
                 type="text"
                 placeholder="https://domain.com/foto.jpg"
                 value={isPreset(avatarUrl) || localPreview ? '' : avatarUrl}
                 onChange={(e) => { setAvatarUrl(e.target.value || 'preset:purple'); setLocalPreview(null); }}
-                className="w-full p-2.5 bg-zinc-950/50 border border-zinc-800 rounded-xl text-xs text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/40 transition"
+                className="w-full p-2.5 bg-zinc-950/50 border border-zinc-800 rounded-xl text-xs text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/40 transition mb-3"
               />
             </div>
 
