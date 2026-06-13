@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
-/* Custom scrollbar biar kaya Discord */
+/* Custom scrollbar ala Discord */
 ::-webkit-scrollbar {
-  width: 8px;
+  width: 6px;
 }
 
 ::-webkit-scrollbar-track {
@@ -10,10 +10,50 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #2b2d31;
-  border-radius: 4px;
+  background: #404249;
+  border-radius: 6px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #404249;
+  background: #5865f2;
+}
+
+/* Animasi fade-in untuk modal & kartu */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.2s ease-out forwards;
+}
+
+/* Animasi glow untuk avatar yang sedang berbicara */
+@keyframes speakingGlow {
+  0%, 100% { box-shadow: 0 0 12px rgba(35, 165, 89, 0.5); }
+  50% { box-shadow: 0 0 24px rgba(35, 165, 89, 0.8); }
+}
+
+/* Animasi gradient background */
+@keyframes gradientShift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.animate-gradient {
+  background-size: 200% 200%;
+  animation: gradientShift 6s ease infinite;
+}
+
+/* Smooth font rendering */
+* {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
