@@ -3,11 +3,11 @@
 import { supabase } from '@/lib/supabaseClient';
 import { useRouter, useParams } from 'next/navigation';
 import { useEffect, useState, useCallback, useRef } from 'react';
-import VoiceChat from '@/components/VoiceChat';
 import { User } from '@supabase/supabase-js';
 import { Plus, Compass, Users, Volume2, ChevronRight, LogOut as LeaveIcon, Link, Mic, PhoneOff } from 'lucide-react';
 import ProfileModal from '@/components/ProfileModal';
 import InviteModal from '@/components/InviteModal';
+import { useVoice } from '@/contexts/VoiceContext';
 
 interface Server {
   id: string;
@@ -41,8 +41,13 @@ export default function ServerDetail() {
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [activeVoiceChannel, setActiveVoiceChannel] = useState<{ id: string; name: string } | null>(null);
-  const [isVoiceVisible, setIsVoiceVisible] = useState(false);
+
+  // Voice state — dari global context
+  const { session: voiceSession, isVisible: isVoiceVisible, joinVoice, showVoice, disconnectVoice } = useVoice();
+  // Channel aktif di server ini (null kalau bukan server ini yg di-voice)
+  const activeVoiceChannel = voiceSession?.serverId === serverId
+    ? { id: voiceSession.channelId, name: voiceSession.channelName }
+    : null;
 
   // State untuk modal kustom saluran suara
   const [isCreateChannelOpen, setIsCreateChannelOpen] = useState(false);
@@ -210,6 +215,7 @@ export default function ServerDetail() {
   }, [serverId, router, refreshCount]);
 
   const handleLogout = async () => {
+    disconnectVoice();
     await supabase.auth.signOut();
     router.push('/');
   };
@@ -270,8 +276,15 @@ export default function ServerDetail() {
   };
 
   const joinVoiceChannel = (channelId: string, channelName: string) => {
-    setActiveVoiceChannel({ id: channelId, name: channelName });
-    setIsVoiceVisible(true);
+    joinVoice({
+      serverId,
+      channelId,
+      channelName,
+      serverName: server?.name || serverId,
+      userEmail: currentUser?.email || 'User',
+      userDisplayName: displayName || currentUser?.email?.split('@')[0] || 'User',
+      userAvatarUrl: avatarUrl || 'preset:purple',
+    });
   };
 
   const getPresetClasses = (id: string) => {
@@ -537,7 +550,7 @@ export default function ServerDetail() {
           </div>
         </div>
 
-        {/* Voice Connection Bar — muncul kalau connected tapi minimize */}
+        {/* Voice Connection Bar — muncul kalau connected ke channel di server ini tapi minimize */}
         {activeVoiceChannel && !isVoiceVisible && (
           <div className="bg-[#232428] border-t border-[#1e1f22]/50 px-3 py-2">
             <div className="flex items-center justify-between">
@@ -549,7 +562,7 @@ export default function ServerDetail() {
                 <div className="min-w-0">
                   <div className="text-green-400 text-[10px] font-bold uppercase tracking-wider">Suara Aktif</div>
                   <div
-                    onClick={() => setIsVoiceVisible(true)}
+                    onClick={showVoice}
                     className="text-white text-xs font-semibold truncate max-w-[100px] cursor-pointer hover:text-indigo-400 transition flex items-center gap-1"
                   >
                     <Mic className="w-3 h-3 text-green-400 flex-shrink-0" />
@@ -559,14 +572,14 @@ export default function ServerDetail() {
               </div>
               <div className="flex items-center gap-1 flex-shrink-0">
                 <button
-                  onClick={() => setIsVoiceVisible(true)}
+                  onClick={showVoice}
                   className="w-7 h-7 bg-[#2b2d31] hover:bg-indigo-600 rounded-lg flex items-center justify-center text-slate-400 hover:text-white transition"
                   title="Buka panel suara"
                 >
                   <Volume2 className="w-3.5 h-3.5" />
                 </button>
                 <button
-                  onClick={() => { setActiveVoiceChannel(null); setIsVoiceVisible(false); }}
+                  onClick={disconnectVoice}
                   className="w-7 h-7 bg-[#2b2d31] hover:bg-red-600/70 rounded-lg flex items-center justify-center text-slate-400 hover:text-red-300 transition"
                   title="Keluar dari voice"
                 >
@@ -648,23 +661,7 @@ export default function ServerDetail() {
         </div>
       </div>
 
-      {/* 5. LiveKit Room — selalu mounted ketika activeVoiceChannel ada, visibility dikontrol via isVisible */}
-      {activeVoiceChannel && (
-        <VoiceChat
-          serverId={serverId}
-          channelId={activeVoiceChannel.id}
-          channelName={activeVoiceChannel.name}
-          userEmail={currentUser?.email || 'User'}
-          userDisplayName={displayName || currentUser?.email?.split('@')[0] || 'User'}
-          userAvatarUrl={avatarUrl || 'preset:purple'}
-          isVisible={isVoiceVisible}
-          onMinimize={() => setIsVoiceVisible(false)}
-          onDisconnect={() => {
-            setActiveVoiceChannel(null);
-            setIsVoiceVisible(false);
-          }}
-        />
-      )}
+      {/* 5. VoiceChat dirender secara global di layout.tsx — tidak perlu di sini */}
 
       {/* 6. Modal Kustom - Pembuatan Saluran */}
       {isCreateChannelOpen && (

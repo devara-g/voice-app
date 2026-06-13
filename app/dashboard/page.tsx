@@ -8,6 +8,7 @@ import ProfileModal from '@/components/ProfileModal';
 import FriendsPanel from '@/components/FriendsPanel';
 import JoinServerModal from '@/components/JoinServerModal';
 import InviteModal from '@/components/InviteModal';
+import { useVoice } from '@/contexts/VoiceContext';
 
 interface ServerData {
   id: string;
@@ -107,7 +108,10 @@ export default function Dashboard() {
     }
   };
 
+  const { disconnectVoice } = useVoice();
+
   const handleLogout = async () => {
+    disconnectVoice();
     await supabase.auth.signOut();
     router.push('/');
   };
