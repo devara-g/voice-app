@@ -153,7 +153,7 @@ export default function VoiceChat({
           console.error('LiveKitRoom error:', err);
           setError(err.message || 'Terjadi kesalahan koneksi LiveKit.');
         }}
-        className="w-full max-w-3xl h-[550px] bg-[#1e1f22] rounded-2xl border border-[#2b2d31] shadow-2xl overflow-hidden flex flex-col"
+        className="w-full max-w-3xl h-[85vh] sm:h-[550px] bg-[#1e1f22] rounded-2xl border border-[#2b2d31] shadow-2xl overflow-hidden flex flex-col"
       >
         <ActiveVoiceRoom
           channelName={channelName}

@@ -3,7 +3,7 @@
 import { supabase } from '@/lib/supabaseClient';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { Plus, LogOut, Compass, Server, ChevronRight, Users, UserPlus, Link } from 'lucide-react';
+import { Plus, LogOut, Compass, Server, ChevronRight, Users, UserPlus, Link, Menu } from 'lucide-react';
 import ProfileModal from '@/components/ProfileModal';
 import FriendsPanel from '@/components/FriendsPanel';
 import JoinServerModal from '@/components/JoinServerModal';
@@ -36,6 +36,7 @@ export default function Dashboard() {
 
   // State untuk fitur baru
   const [isFriendsPanelOpen, setIsFriendsPanelOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isJoinServerOpen, setIsJoinServerOpen] = useState(false);
   const [inviteModalServerId, setInviteModalServerId] = useState<string | null>(null);
   const [inviteModalServerName, setInviteModalServerName] = useState<string | null>(null);
@@ -142,6 +143,8 @@ export default function Dashboard() {
       setServers((currentServers) => [...currentServers, data]);
       setIsCreateModalOpen(false);
       setNewServerName('');
+      // Navigasi ke server baru
+      router.push(`/server/${data.id}`);
     }
   };
 
@@ -176,6 +179,11 @@ export default function Dashboard() {
     return gradients[sum % gradients.length];
   };
 
+  const getHoverGradient = (name: string) => {
+    const grad = getGradient(name);
+    return grad.split(' ').map((cls) => `hover:${cls}`).join(' ');
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#1e1f22] flex flex-col items-center justify-center">
@@ -186,9 +194,11 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-[#1e1f22] flex">
+    <div className="min-h-screen bg-[#1e1f22] flex overflow-hidden">
       {/* Sidebar kiri - daftar server ala Discord */}
-      <div className="fixed left-0 top-0 h-full w-[72px] bg-[#1e1f22] flex flex-col items-center py-3 gap-2 border-r border-[#2b2d31] z-20">
+      <div className={`fixed left-0 top-0 h-full w-[72px] bg-[#1e1f22] flex flex-col items-center py-3 gap-2 border-r border-[#2b2d31] z-40 transition-transform duration-300 ${
+        isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+      }`}>
         
         {/* Home / Dashboard button */}
         <div className="group relative w-12 h-12 flex items-center justify-center cursor-pointer">
@@ -216,7 +226,7 @@ export default function Dashboard() {
             {/* Pill Indicator */}
             <div className="absolute left-0 w-1 bg-white rounded-r-md transition-all duration-200 origin-left scale-y-0 group-hover:scale-y-[0.6] group-active:scale-y-[1] h-8" />
             
-            <div className={`w-12 h-12 bg-[#2b2d31] rounded-2xl hover:rounded-xl transition-all flex items-center justify-center text-white font-bold hover:bg-gradient-to-tr hover:${getGradient(server.name)} shadow-md`}>
+            <div className={`w-12 h-12 bg-[#2b2d31] rounded-2xl hover:rounded-xl transition-all flex items-center justify-center text-white font-bold hover:bg-gradient-to-tr ${getHoverGradient(server.name)} shadow-md`}>
               {server.name.charAt(0).toUpperCase()}
             </div>
             
@@ -260,23 +270,40 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Backdrop for mobile sidebar */}
+      {isSidebarOpen && (
+        <div 
+          onClick={() => setIsSidebarOpen(false)} 
+          className="fixed inset-0 bg-black/55 z-35 md:hidden"
+        />
+      )}
+
       {/* Area utama */}
-      <div className="ml-[72px] flex-1 flex flex-col min-h-screen">
+      <div className="flex-1 flex flex-col min-h-screen md:ml-[72px] overflow-y-auto">
         {/* Header */}
-        <div className="h-14 bg-[#2b2d31] border-b border-[#1e1f22] flex items-center justify-between px-6 shadow-md z-10">
-          <div className="flex items-center gap-2 text-white font-bold text-lg">
-            <Compass className="w-5 h-5 text-indigo-400" />
-            <span>SiHALO Dashboard</span>
+        <div className="h-14 bg-[#2b2d31] border-b border-[#1e1f22] flex items-center justify-between px-4 md:px-6 shadow-md z-10 flex-shrink-0">
+          <div className="flex items-center gap-2">
+            {/* Toggle Button for mobile */}
+            <button
+              onClick={() => setIsSidebarOpen(true)}
+              className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-[#35373d] md:hidden transition mr-1"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+            <div className="flex items-center gap-2 text-white font-bold text-base md:text-lg">
+              <Compass className="w-5 h-5 text-indigo-400" />
+              <span>SiHALO Dashboard</span>
+            </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             {/* Friends Button */}
             <button
               onClick={() => setIsFriendsPanelOpen(true)}
-              className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-zinc-800/40 hover:bg-zinc-800/80 border border-zinc-800/60 hover:border-zinc-700 text-slate-300 hover:text-white transition text-sm font-semibold"
+              className="flex items-center gap-2 px-2.5 py-1.5 sm:px-3.5 sm:py-1.5 rounded-xl bg-zinc-800/40 hover:bg-zinc-800/80 border border-zinc-800/60 hover:border-zinc-700 text-slate-300 hover:text-white transition text-xs sm:text-sm font-semibold"
               title="Teman"
             >
               <Users className="w-4 h-4" />
-              <span>Teman</span>
+              <span className="hidden sm:inline">Teman</span>
             </button>
 
             {/* Add Friend shortcut */}
@@ -307,7 +334,7 @@ export default function Dashboard() {
                   onError={() => setAvatarUrl('preset:purple')}
                 />
               )}
-              <div className="text-left min-w-0">
+              <div className="text-left min-w-0 hidden sm:block">
                 <div className="text-white text-xs font-bold truncate max-w-[120px] group-hover:text-indigo-400 transition">
                   {displayName}
                 </div>
@@ -319,32 +346,32 @@ export default function Dashboard() {
 
             <button
               onClick={handleLogout}
-              className="flex items-center gap-1.5 bg-[#f23f43]/10 hover:bg-[#f23f43]/20 text-[#f23f43] px-3.5 py-1.5 rounded-lg text-sm font-semibold transition active:scale-95 border border-red-500/5"
+              className="flex items-center gap-1.5 bg-[#f23f43]/10 hover:bg-[#f23f43]/20 text-[#f23f43] px-2.5 py-1.5 sm:px-3.5 sm:py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition active:scale-95 border border-red-500/5"
             >
               <LogOut className="w-4 h-4" />
-              <span>Keluar</span>
+              <span className="hidden sm:inline">Keluar</span>
             </button>
           </div>
         </div>
 
         {/* Konten Utama */}
-        <div className="p-8 flex-1 max-w-6xl w-full mx-auto">
-          <div className="flex justify-between items-center mb-6">
+        <div className="p-4 sm:p-8 flex-1 max-w-6xl w-full mx-auto">
+          <div className="flex flex-col sm:flex-row gap-4 sm:justify-between sm:items-center mb-6">
             <div>
-              <h1 className="text-white text-2xl font-extrabold tracking-tight">Pelayan Anda ({servers.length})</h1>
-              <p className="text-slate-400 text-sm mt-1">Pilih server di bawah ini untuk memulai obrolan suara</p>
+              <h1 className="text-white text-xl sm:text-2xl font-extrabold tracking-tight">Pelayan Anda ({servers.length})</h1>
+              <p className="text-slate-400 text-xs sm:text-sm mt-1">Pilih server di bawah ini untuk memulai obrolan suara</p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 w-full sm:w-auto">
               <button
                 onClick={() => setIsJoinServerOpen(true)}
-                className="flex items-center gap-2 bg-[#2b2d31] hover:bg-[#35373d] border border-[#35373d] text-slate-300 hover:text-white px-4 py-2.5 rounded-xl text-sm font-bold transition active:scale-95"
+                className="flex items-center gap-2 bg-[#2b2d31] hover:bg-[#35373d] border border-[#35373d] text-slate-300 hover:text-white px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold transition active:scale-95 flex-1 sm:flex-none justify-center"
               >
                 <Link className="w-4 h-4" />
                 <span>Gabung Server</span>
               </button>
               <button
                 onClick={() => setIsCreateModalOpen(true)}
-                className="flex items-center gap-2 bg-[#5865f2] hover:bg-[#4752c4] text-white px-4 py-2.5 rounded-xl text-sm font-bold transition shadow-lg shadow-indigo-500/20 active:scale-95"
+                className="flex items-center gap-2 bg-[#5865f2] hover:bg-[#4752c4] text-white px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold transition shadow-lg shadow-indigo-500/20 active:scale-95 flex-1 sm:flex-none justify-center"
               >
                 <Plus className="w-4 h-4" />
                 <span>Buat Server</span>
