@@ -371,6 +371,21 @@ export default function TextChat({ channelId, channelName, currentUserId }: Text
     .slice(0, 3)
     .map(([userId, data]) => ({ userId, ...data }));
 
+  const renderTypingAvatar = (displayName: string, avatarUrl: string | null) => {
+    const isPreset = avatarUrl?.startsWith('preset:');
+
+    if (isPreset || !avatarUrl) {
+      return (
+        <div className={`flex h-8 w-8 items-center justify-center rounded-full ${getGradient(displayName)} text-[11px] font-bold text-white shadow-sm ring-2 ring-[#313338]`}>
+          {displayName.charAt(0).toUpperCase()}
+        </div>
+      );
+    }
+
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={avatarUrl} alt={displayName} className="h-8 w-8 rounded-full object-cover shadow-sm ring-2 ring-[#313338]" />;
+  };
+
   const typingLabel = () => {
     if (typingPeople.length === 0) return '';
     if (typingPeople.length === 1) {
@@ -493,14 +508,17 @@ export default function TextChat({ channelId, channelName, currentUserId }: Text
                 );
               })}
               {typingPeople.length > 0 && (
-                <div className="mt-2 flex items-end gap-3 rounded-2xl px-3 py-2.5 pr-16">
+                <div className="mt-2 flex items-end gap-3 rounded-2xl px-3 py-2.5 pr-16 transition-colors hover:bg-white/[0.02]">
                   <div className="flex-shrink-0 pt-0.5">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#2b2d31] text-xs font-semibold text-white shadow-lg shadow-black/10 ring-2 ring-white/5">
-                      <div className="flex items-center gap-1">
-                        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-zinc-300 [animation-delay:-0.2s]" />
-                        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-zinc-300 [animation-delay:-0.1s]" />
-                        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-zinc-300" />
-                      </div>
+                    <div className="relative flex h-10 w-10 items-center justify-center">
+                      {typingPeople.slice(0, 3).map((person, index) => (
+                        <div
+                          key={person.userId}
+                          className={index === 0 ? 'absolute left-0 top-0 z-30' : index === 1 ? 'absolute left-2 top-0 z-20' : 'absolute left-4 top-0 z-10'}
+                        >
+                          {renderTypingAvatar(person.displayName, person.avatarUrl)}
+                        </div>
+                      ))}
                     </div>
                   </div>
 
