@@ -11,7 +11,7 @@ import {
   VideoTrack,
 } from '@livekit/components-react';
 import { Track } from 'livekit-client';
-import { Mic, MicOff, PhoneOff, Users, ChevronDown, ScreenShare, ScreenShareOff } from 'lucide-react';
+import { Mic, MicOff, PhoneOff, Users, ChevronDown, ScreenShare, ScreenShareOff, Maximize2, Minimize2 } from 'lucide-react';
 import '@livekit/components-styles';
 import { playJoinSound, playLeaveSound, playMemberJoinSound, playMemberLeaveSound } from '@/lib/sounds';
 
@@ -199,7 +199,9 @@ function ActiveVoiceRoom({
     { source: Track.Source.ScreenShare, withPlaceholder: false },
   ]);
   const prevCountRef = useRef(participants.length);
+  const screenSharePanelRef = useRef<HTMLDivElement | null>(null);
   const [screenShareError, setScreenShareError] = useState<string | null>(null);
+  const [isScreenShareFullscreen, setIsScreenShareFullscreen] = useState(false);
 
   // SFX saat ada orang lain join/leave (bukan kita sendiri)
   useEffect(() => {
@@ -212,6 +214,15 @@ function ActiveVoiceRoom({
     }
     prevCountRef.current = curr;
   }, [participants.length]);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsScreenShareFullscreen(Boolean(document.fullscreenElement));
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
 
   const toggleMute = async () => {
     if (localParticipant) {
@@ -233,6 +244,28 @@ function ActiveVoiceRoom({
             : 'Gagal menyalakan share screen.';
         setScreenShareError(message);
       }
+    }
+  };
+
+  const toggleScreenShareFullscreen = async () => {
+    const panel = screenSharePanelRef.current;
+
+    try {
+      if (!panel) return;
+
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+        return;
+      }
+
+      if (panel.requestFullscreen) {
+        await panel.requestFullscreen();
+      } else {
+        setIsScreenShareFullscreen((value) => !value);
+      }
+    } catch (err) {
+      console.error('Fullscreen toggle failed:', err);
+      setScreenShareError('Browser menolak fullscreen untuk share screen.');
     }
   };
 
@@ -358,19 +391,34 @@ function ActiveVoiceRoom({
       </div>
 
       {screenShareTracks.length > 0 && (
-        <div className="border-t border-[#1e1f22] bg-[#1e1f22] px-4 py-3">
+        <div
+          ref={screenSharePanelRef}
+          className={isScreenShareFullscreen
+            ? 'fixed inset-0 z-[70] bg-black px-4 py-4 flex flex-col'
+            : 'border-t border-[#1e1f22] bg-[#1e1f22] px-4 py-3'}
+        >
           <div className="flex items-center justify-between mb-3">
             <div>
               <div className="text-white text-sm font-semibold">Share Screen Aktif</div>
               <div className="text-slate-400 text-xs">Peserta sedang membagikan layar.</div>
             </div>
-            <div className="text-[10px] uppercase tracking-[0.2em] text-indigo-300 font-bold">
-              Live
+            <div className="flex items-center gap-2">
+              <div className="text-[10px] uppercase tracking-[0.2em] text-indigo-300 font-bold">
+                Live
+              </div>
+              <button
+                onClick={toggleScreenShareFullscreen}
+                className="inline-flex items-center gap-1 rounded-lg bg-[#2b2d31] px-2.5 py-1.5 text-xs font-semibold text-slate-300 transition hover:bg-[#404249] hover:text-white"
+                title={isScreenShareFullscreen ? 'Keluar fullscreen' : 'Fullscreen'}
+              >
+                {isScreenShareFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+                <span className="hidden sm:inline">{isScreenShareFullscreen ? 'Minimize' : 'Fullscreen'}</span>
+              </button>
             </div>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className={isScreenShareFullscreen ? 'flex-1 min-h-0' : 'grid gap-3 sm:grid-cols-2'}>
             <TrackLoop tracks={screenShareTracks}>
-              <VideoTrack className="w-full rounded-xl border border-[#35373d] bg-black aspect-video object-cover" />
+              <VideoTrack className={isScreenShareFullscreen ? 'w-full h-full rounded-xl border border-[#35373d] bg-black object-contain' : 'w-full rounded-xl border border-[#35373d] bg-black aspect-video object-cover'} />
             </TrackLoop>
           </div>
         </div>
