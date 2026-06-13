@@ -1,5 +1,7 @@
 'use client';
 
+import { Shield, User as UserIcon, X, Crown, Sparkles } from 'lucide-react';
+
 interface UserProfileCardProps {
   member: {
     user_id: string;
@@ -42,7 +44,6 @@ export default function UserProfileCard({
     ? PRESET_GRADIENTS[avatarUrl!] || 'from-purple-500 to-indigo-500'
     : getGradient(member.email);
 
-  // Pick a subtle banner color based on gradient
   const bannerGradient = gradientClass;
 
   const maskedEmail = member.email
@@ -50,18 +51,17 @@ export default function UserProfileCard({
     : '';
 
   return (
-    /* Backdrop */
     <div
-      className="fixed inset-0 z-[70] flex items-center justify-center p-4"
+      className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm transition-opacity"
       onClick={onClose}
     >
-      {/* Card — stop propagation so clicking inside doesn't close */}
       <div
-        className="relative w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl bg-[#232428] border border-[#2b2d31] animate-fade-in"
+        className="relative w-full max-w-sm rounded-[24px] overflow-hidden bg-[#111214] border border-white/10 shadow-[0_0_50px_rgba(0,0,0,0.5)] animate-fade-in flex flex-col"
         onClick={(e) => e.stopPropagation()}
+        style={{ animationDuration: '200ms' }}
       >
-        {/* Banner */}
-        <div className={`h-32 w-full bg-gradient-to-br ${bannerGradient} relative`}>
+        {/* Banner Section */}
+        <div className={`relative h-32 w-full bg-gradient-to-br ${bannerGradient}`}>
           {member.banner_url && (
             <img 
               src={member.banner_url} 
@@ -70,84 +70,101 @@ export default function UserProfileCard({
               onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
             />
           )}
-          {/* Close button */}
+          
+          {/* Subtle gradient overlay at the bottom of banner to blend with the card */}
+          <div className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-[#111214] to-transparent" />
+
+          {/* Controls */}
           <button
             onClick={onClose}
-            className="absolute top-2 right-2 w-7 h-7 bg-black/40 hover:bg-black/60 rounded-full flex items-center justify-center text-white transition"
+            className="absolute top-3 right-3 w-8 h-8 bg-black/40 hover:bg-black/70 backdrop-blur-md rounded-full flex items-center justify-center text-white/70 hover:text-white transition-all hover:scale-105 active:scale-95 z-10"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            <X className="w-4 h-4" />
           </button>
 
-          {/* Badges */}
-          <div className="absolute top-2 left-2 flex gap-1.5">
+          {/* Badges on Banner */}
+          <div className="absolute top-3 left-3 flex flex-wrap gap-1.5 z-10">
             {isOwner && (
-              <span className="bg-amber-500/90 text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
-                👑 Owner
-              </span>
+              <div className="bg-amber-500/90 backdrop-blur-md border border-amber-400/50 text-white text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1 shadow-lg">
+                <Crown className="w-3 h-3" />
+                <span>Owner</span>
+              </div>
             )}
             {isCurrentUser && (
-              <span className="bg-indigo-500/90 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
-                Kamu
-              </span>
+              <div className="bg-indigo-500/90 backdrop-blur-md border border-indigo-400/50 text-white text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1 shadow-lg">
+                <Sparkles className="w-3 h-3" />
+                <span>Kamu</span>
+              </div>
             )}
           </div>
         </div>
 
-        {/* Avatar — overlaps banner */}
-        <div className="px-5 pb-5">
-          <div className="relative -mt-10 mb-3 flex items-end gap-3">
-            {/* Avatar */}
+        {/* Content Section */}
+        <div className="px-6 pb-6 relative flex flex-col">
+          {/* Avatar Area */}
+          <div className="relative -mt-12 mb-4 flex justify-between items-end">
             <div className="relative">
-              {!isPreset && avatarUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={avatarUrl}
-                  alt={member.display_name}
-                  className="w-20 h-20 rounded-full object-cover border-4 border-[#232428] shadow-xl"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = 'none';
-                  }}
-                />
-              ) : (
-                <div
-                  className={`w-20 h-20 rounded-full bg-gradient-to-tr ${gradientClass} flex items-center justify-center text-white text-3xl font-extrabold border-4 border-[#232428] shadow-xl`}
-                >
-                  {member.display_name.charAt(0).toUpperCase()}
-                </div>
-              )}
-              {/* Online dot */}
-              {isCurrentUser && (
-                <div className="absolute bottom-1 right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-[#232428]" />
-              )}
+              <div className="relative w-[92px] h-[92px] rounded-full border-[6px] border-[#111214] bg-[#111214] shadow-2xl z-10">
+                {!isPreset && avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={avatarUrl}
+                    alt={member.display_name}
+                    className="w-full h-full rounded-full object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = 'none';
+                    }}
+                  />
+                ) : (
+                  <div
+                    className={`w-full h-full rounded-full bg-gradient-to-tr ${gradientClass} flex items-center justify-center text-white text-3xl font-extrabold`}
+                  >
+                    {member.display_name.charAt(0).toUpperCase()}
+                  </div>
+                )}
+                {/* Online Indicator */}
+                {isCurrentUser && (
+                  <div className="absolute bottom-1 right-1 w-5 h-5 bg-emerald-500 rounded-full border-[4px] border-[#111214] shadow-sm z-20" />
+                )}
+              </div>
+            </div>
+            
+            {/* Quick Action Placeholder (e.g., Message) */}
+            <div className="mb-2 z-10">
+              <button className="bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-bold px-4 py-2 rounded-xl transition-colors shadow-lg shadow-indigo-500/20 active:scale-95">
+                Kirim Pesan
+              </button>
             </div>
           </div>
 
-          {/* Name */}
-          <h3 className="text-white text-lg font-extrabold leading-tight">
-            {member.display_name}
-          </h3>
-          <p className="text-slate-500 text-xs mb-3">{maskedEmail}</p>
+          {/* User Info */}
+          <div className="mb-5">
+            <h3 className="text-white text-2xl font-black tracking-tight leading-none mb-1 flex items-center gap-2">
+              {member.display_name}
+            </h3>
+            <p className="text-zinc-400 text-sm font-medium">{maskedEmail}</p>
+          </div>
 
-          {/* Bio */}
-          {member.bio ? (
-            <div className="bg-[#2b2d31] rounded-xl p-3 mb-4 border border-[#35373d]/50">
-              <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-1">Tentang Saya</p>
-              <p className="text-slate-200 text-sm leading-relaxed">{member.bio}</p>
-            </div>
-          ) : (
-            <div className="bg-[#2b2d31] rounded-xl p-3 mb-4 border border-[#35373d]/50">
-              <p className="text-slate-500 text-xs italic">Belum ada bio.</p>
-            </div>
-          )}
+          {/* Separator */}
+          <div className="w-full h-px bg-white/5 mb-5" />
 
-          {/* Member Since placeholder */}
-          <div className="flex items-center gap-2 text-slate-500 text-[10px] font-semibold uppercase tracking-wider">
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-            </svg>
-            Anggota Server
+          {/* Bio Section */}
+          <div className="bg-[#1e1f22]/60 backdrop-blur-xl border border-white/5 rounded-[16px] p-4 mb-5">
+            <h4 className="text-zinc-400 text-[10px] font-bold uppercase tracking-widest mb-2 flex items-center gap-1.5">
+              <UserIcon className="w-3.5 h-3.5" />
+              Tentang Saya
+            </h4>
+            {member.bio ? (
+              <p className="text-zinc-200 text-sm leading-relaxed whitespace-pre-wrap">{member.bio}</p>
+            ) : (
+              <p className="text-zinc-500 text-xs italic">Belum ada bio yang ditulis.</p>
+            )}
+          </div>
+
+          {/* Footer Info */}
+          <div className="flex items-center gap-2 text-zinc-500 text-[10px] font-bold uppercase tracking-widest bg-white/[0.02] rounded-xl px-3 py-2 border border-white/[0.02] w-fit">
+            <Shield className="w-3.5 h-3.5" />
+            <span>Anggota Server</span>
           </div>
         </div>
       </div>

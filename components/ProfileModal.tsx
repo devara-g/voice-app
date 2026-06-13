@@ -10,11 +10,11 @@ interface ProfileModalProps {
 }
 
 const PRESET_GRADIENTS = [
-  { id: 'preset:pink',    name: 'Rose Petal',    classes: 'from-pink-500 to-rose-500' },
-  { id: 'preset:purple',  name: 'Indigo Nights', classes: 'from-purple-500 to-indigo-500' },
-  { id: 'preset:blue',    name: 'Deep Ocean',    classes: 'from-blue-500 to-cyan-500' },
-  { id: 'preset:emerald', name: 'Teal Forest',   classes: 'from-emerald-500 to-teal-500' },
-  { id: 'preset:orange',  name: 'Sunset Glow',   classes: 'from-orange-500 to-amber-500' },
+  { id: 'preset:pink', name: 'Rose Petal', classes: 'from-pink-500 to-rose-500' },
+  { id: 'preset:purple', name: 'Indigo Nights', classes: 'from-purple-500 to-indigo-500' },
+  { id: 'preset:blue', name: 'Deep Ocean', classes: 'from-blue-500 to-cyan-500' },
+  { id: 'preset:emerald', name: 'Teal Forest', classes: 'from-emerald-500 to-teal-500' },
+  { id: 'preset:orange', name: 'Sunset Glow', classes: 'from-orange-500 to-amber-500' },
 ];
 
 export default function ProfileModal({ onClose, onProfileUpdate }: ProfileModalProps) {
@@ -268,11 +268,10 @@ export default function ProfileModal({ onClose, onProfileUpdate }: ProfileModalP
                 )}
 
                 {/* Hover overlay */}
-                <div className={`absolute inset-0 rounded-full flex flex-col items-center justify-center transition-all duration-200 ${
-                  uploading
+                <div className={`absolute inset-0 rounded-full flex flex-col items-center justify-center transition-all duration-200 ${uploading
                     ? 'bg-black/60'
                     : 'bg-black/0 group-hover:bg-black/50'
-                }`}>
+                  }`}>
                   {uploading ? (
                     <div className="flex flex-col items-center gap-1">
                       <Loader2 className="w-6 h-6 text-white animate-spin" />
@@ -333,16 +332,16 @@ export default function ProfileModal({ onClose, onProfileUpdate }: ProfileModalP
               <label className="block text-zinc-400 text-[10px] font-bold tracking-wider uppercase mb-2 text-center">
                 Banner Profil
               </label>
-              
-              <div 
+
+              <div
                 className={`relative w-full h-32 rounded-xl border-2 ${displayBanner ? 'border-zinc-700' : 'border-dashed border-zinc-700'} overflow-hidden group cursor-pointer bg-zinc-900/50 mb-2 flex items-center justify-center`}
                 onClick={() => !bannerUploading && bannerFileInputRef.current?.click()}
               >
                 {displayBanner ? (
-                  <img 
-                    src={displayBanner} 
-                    alt="Preview Banner" 
-                    className="absolute inset-0 w-full h-full object-cover" 
+                  <img
+                    src={displayBanner}
+                    alt="Preview Banner"
+                    className="absolute inset-0 w-full h-full object-cover"
                   />
                 ) : (
                   <div className="text-zinc-500 flex flex-col items-center gap-2">
@@ -350,11 +349,10 @@ export default function ProfileModal({ onClose, onProfileUpdate }: ProfileModalP
                     <span className="text-xs font-semibold">Klik untuk memilih banner</span>
                   </div>
                 )}
-                
+
                 {/* Overlay Banner Upload */}
-                <div className={`absolute inset-0 flex flex-col items-center justify-center transition-all duration-200 ${
-                  bannerUploading ? 'bg-black/70' : 'bg-black/0 group-hover:bg-black/60'
-                }`}>
+                <div className={`absolute inset-0 flex flex-col items-center justify-center transition-all duration-200 ${bannerUploading ? 'bg-black/70' : 'bg-black/0 group-hover:bg-black/60'
+                  }`}>
                   {bannerUploading ? (
                     <div className="flex flex-col items-center gap-2">
                       <Loader2 className="w-6 h-6 text-white animate-spin" />
@@ -380,7 +378,7 @@ export default function ProfileModal({ onClose, onProfileUpdate }: ProfileModalP
                 onChange={handleBannerSelect}
                 disabled={bannerUploading}
               />
-              
+
               <div className="flex justify-between items-center px-1">
                 <span className="text-[10px] text-zinc-500">JPG, PNG, WebP, GIF · Maks 5MB</span>
                 {displayBanner && (
@@ -413,9 +411,8 @@ export default function ProfileModal({ onClose, onProfileUpdate }: ProfileModalP
                       type="button"
                       onClick={() => { setAvatarUrl(p.id); setLocalPreview(null); }}
                       disabled={uploading}
-                      className={`w-10 h-10 rounded-full bg-gradient-to-tr ${p.classes} flex items-center justify-center text-white text-xs font-bold hover:scale-110 transition-all relative border-2 shadow-md ${
-                        selected ? 'border-white scale-110' : 'border-white/10'
-                      }`}
+                      className={`w-10 h-10 rounded-full bg-gradient-to-tr ${p.classes} flex items-center justify-center text-white text-xs font-bold hover:scale-110 transition-all relative border-2 shadow-md ${selected ? 'border-white scale-110' : 'border-white/10'
+                        }`}
                       title={p.name}
                     >
                       {selected && (
@@ -502,11 +499,10 @@ export default function ProfileModal({ onClose, onProfileUpdate }: ProfileModalP
 
             {/* Message */}
             {message && (
-              <div className={`p-3 rounded-xl text-xs font-medium border animate-fade-in ${
-                message.type === 'success'
+              <div className={`p-3 rounded-xl text-xs font-medium border animate-fade-in ${message.type === 'success'
                   ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
                   : 'bg-rose-500/10 border-rose-500/20 text-rose-400'
-              }`}>
+                }`}>
                 {message.text}
               </div>
             )}

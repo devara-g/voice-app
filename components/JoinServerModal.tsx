@@ -44,8 +44,8 @@ export default function JoinServerModal({ userId, onClose, onJoined }: JoinServe
   };
 
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[60] p-4 animate-fade-in">
-      <div className="bg-[#2b2d31] border border-[#1e1f22] rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center overflow-y-auto z-[60] p-4 animate-fade-in">
+      <div className="bg-[#2b2d31] border border-[#1e1f22] rounded-2xl w-full max-w-md shadow-2xl overflow-hidden max-h-[calc(100vh-2rem)]">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-5 border-b border-[#1e1f22]">
           <div>

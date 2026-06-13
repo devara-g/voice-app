@@ -135,6 +135,12 @@ export default function Dashboard() {
       .select()
       .single();
 
+    if (!error && data) {
+      await supabase
+        .from('members')
+        .insert([{ server_id: data.id, user_id: user.id }]);
+    }
+
     setCreating(false);
 
     if (error) {
