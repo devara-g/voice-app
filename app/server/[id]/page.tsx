@@ -146,6 +146,19 @@ export default function ServerDetail() {
         .select('*')
         .eq('server_id', serverId)
         .order('created_at', { ascending: true });
+      if (data) {
+        setChannels(data);
+        const currentActiveId = activeTextChannel?.id;
+        const activeStillExists = currentActiveId ? data.some((channel) => channel.id === currentActiveId) : false;
+
+        if (!activeStillExists) {
+          const firstText = data.find((channel: Channel) => channel.type === 'text');
+          setActiveTextChannel(firstText ? { id: firstText.id, name: firstText.name } : null);
+        } else if (activeTextChannel) {
+          const updatedActive = data.find((channel) => channel.id === activeTextChannel.id);
+          if (updatedActive) setActiveTextChannel({ id: updatedActive.id, name: updatedActive.name });
+        }
+      }
 
       if (data) {
         setChannels(data);
@@ -899,6 +912,10 @@ export default function ServerDetail() {
             setActiveTextChannel({ id: updated.id, name: updated.name });
             setIsEditChannelOpen(false);
           }}
+          onDeleted={() => {
+            setIsEditChannelOpen(false);
+            refreshChannels();
+          }}
         />
       )}
 
@@ -993,6 +1010,10 @@ export default function ServerDetail() {
           onUpdated={(updated) => {
             setServer((prev) => prev ? { ...prev, ...updated } : prev);
             setIsServerSettingsOpen(false);
+          }}
+          onDeleted={() => {
+            setIsServerSettingsOpen(false);
+            router.push('/dashboard');
           }}
         />
       )}

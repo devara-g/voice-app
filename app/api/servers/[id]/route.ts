@@ -87,3 +87,63 @@ export async function PATCH(
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
+
+// DELETE /api/servers/[id] — delete server and its related rows (owner only)
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  if (!id) return NextResponse.json({ error: 'Missing server id' }, { status: 400 });
+
+  try {
+    const body = await req.json();
+    const { userId } = body;
+
+    if (!userId) {
+      return NextResponse.json({ error: 'userId diperlukan' }, { status: 400 });
+    }
+
+    const { data: server, error: fetchError } = await supabaseAdmin
+      .from('servers')
+      .select('id, owner_id')
+      .eq('id', id)
+      .single();
+
+    if (fetchError || !server) {
+      return NextResponse.json({ error: 'Server tidak ditemukan' }, { status: 404 });
+    }
+
+    if (server.owner_id !== userId) {
+      return NextResponse.json({ error: 'Hanya owner yang dapat menghapus server' }, { status: 403 });
+    }
+
+    const { data: channels } = await supabaseAdmin
+      .from('channels')
+      .select('id')
+      .eq('server_id', id);
+
+    const channelIds = (channels || []).map((channel) => channel.id);
+
+    if (channelIds.length > 0) {
+      await supabaseAdmin.from('messages').delete().in('channel_id', channelIds);
+    }
+
+    await supabaseAdmin.from('members').delete().eq('server_id', id);
+    await supabaseAdmin.from('channels').delete().eq('server_id', id);
+
+    const { error: deleteError } = await supabaseAdmin
+      .from('servers')
+      .delete()
+      .eq('id', id);
+
+    if (deleteError) {
+      return NextResponse.json({ error: deleteError.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    console.error('DELETE /api/servers/[id] error:', err);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}

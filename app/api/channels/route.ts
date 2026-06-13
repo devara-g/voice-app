@@ -108,3 +108,52 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const { channel_id, user_id } = await req.json();
+
+    if (!channel_id || !user_id) {
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    }
+
+    const { data: channel, error: channelError } = await supabaseAdmin
+      .from('channels')
+      .select('id, server_id')
+      .eq('id', channel_id)
+      .single();
+
+    if (channelError || !channel) {
+      return NextResponse.json({ error: 'Channel not found' }, { status: 404 });
+    }
+
+    const { data: server, error: serverError } = await supabaseAdmin
+      .from('servers')
+      .select('id, owner_id')
+      .eq('id', channel.server_id)
+      .single();
+
+    if (serverError || !server) {
+      return NextResponse.json({ error: 'Server not found' }, { status: 404 });
+    }
+
+    if (server.owner_id !== user_id) {
+      return NextResponse.json({ error: 'Hanya owner yang dapat menghapus channel' }, { status: 403 });
+    }
+
+    await supabaseAdmin.from('messages').delete().eq('channel_id', channel_id);
+
+    const { error: deleteError } = await supabaseAdmin
+      .from('channels')
+      .delete()
+      .eq('id', channel_id);
+
+    if (deleteError) {
+      return NextResponse.json({ error: deleteError.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ ok: true });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}

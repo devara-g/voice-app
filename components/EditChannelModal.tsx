@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { X, Hash } from 'lucide-react';
+import { X, Hash, Trash2 } from 'lucide-react';
 
 interface EditChannelModalProps {
   channelId: string;
@@ -10,6 +10,7 @@ interface EditChannelModalProps {
   userId: string;
   onClose: () => void;
   onUpdated: (updated: { id: string; name: string; type: 'text' | 'voice' }) => void;
+  onDeleted: (channelId: string) => void;
 }
 
 export default function EditChannelModal({
@@ -19,6 +20,7 @@ export default function EditChannelModal({
   userId,
   onClose,
   onUpdated,
+  onDeleted,
 }: EditChannelModalProps) {
   const [name, setName] = useState(initialName);
   const [loading, setLoading] = useState(false);
@@ -62,6 +64,37 @@ export default function EditChannelModal({
     }
   };
 
+  const handleDelete = async () => {
+    const confirmation = window.prompt(`Ketik nama channel "${initialName}" untuk menghapusnya`);
+    if (confirmation?.trim() !== initialName.trim()) return;
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const res = await fetch('/api/channels', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          channel_id: channelId,
+          user_id: userId,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Gagal menghapus channel');
+      }
+
+      onDeleted(channelId);
+      onClose();
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/60 p-4 backdrop-blur-sm animate-fade-in">
       <div className="flex max-h-[calc(100vh-2rem)] w-full max-w-md flex-col overflow-hidden rounded-2xl bg-[#313338] shadow-2xl">
@@ -95,17 +128,29 @@ export default function EditChannelModal({
 
           {error && <div className="text-sm text-red-400">{error}</div>}
 
-          <div className="flex justify-end gap-3 border-t border-white/10 pt-4">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-zinc-300 hover:underline">
-              Batal
-            </button>
+          <div className="flex flex-col gap-3 border-t border-white/10 pt-4">
             <button
-              type="submit"
-              disabled={loading || !name.trim()}
-              className="rounded-md bg-indigo-500 px-5 py-2 text-sm font-medium text-white transition hover:bg-indigo-600 disabled:opacity-50"
+              type="button"
+              onClick={handleDelete}
+              disabled={loading}
+              className="flex items-center justify-center gap-2 rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-2.5 text-sm font-semibold text-rose-300 transition hover:bg-rose-500/15 hover:text-rose-200 disabled:opacity-50"
             >
-              {loading ? 'Menyimpan...' : 'Simpan'}
+              <Trash2 className="h-4 w-4" />
+              Hapus Channel
             </button>
+
+            <div className="flex justify-end gap-3">
+              <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-zinc-300 hover:underline">
+                Batal
+              </button>
+              <button
+                type="submit"
+                disabled={loading || !name.trim()}
+                className="rounded-md bg-indigo-500 px-5 py-2 text-sm font-medium text-white transition hover:bg-indigo-600 disabled:opacity-50"
+              >
+                {loading ? 'Menyimpan...' : 'Simpan'}
+              </button>
+            </div>
           </div>
         </form>
       </div>

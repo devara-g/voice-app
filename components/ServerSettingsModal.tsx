@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { X, Camera, Upload, Loader2, Check, Server, Image as ImageIcon, Type } from 'lucide-react';
+import { X, Camera, Upload, Loader2, Check, Server, Image as ImageIcon, Type, Trash2 } from 'lucide-react';
 
 interface ServerSettingsModalProps {
   serverId: string;
@@ -11,6 +11,7 @@ interface ServerSettingsModalProps {
   userId: string;
   onClose: () => void;
   onUpdated: (updated: { name: string; image_url: string | null; banner_url: string | null }) => void;
+  onDeleted: () => void;
 }
 
 export default function ServerSettingsModal({
@@ -21,6 +22,7 @@ export default function ServerSettingsModal({
   userId,
   onClose,
   onUpdated,
+  onDeleted,
 }: ServerSettingsModalProps) {
   const [name, setName] = useState(serverName);
   const [imageUrl, setImageUrl] = useState(serverImageUrl || '');
@@ -148,6 +150,30 @@ export default function ServerSettingsModal({
     } catch (err) {
       setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Gagal menyimpan.' });
     } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteServer = async () => {
+    const confirmation = window.prompt(`Ketik nama server "${serverName}" untuk menghapus server ini`);
+    if (confirmation?.trim() !== serverName.trim()) return;
+
+    setSaving(true);
+    setMessage(null);
+
+    try {
+      const res = await fetch(`/api/servers/${serverId}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Gagal menghapus server');
+
+      onDeleted();
+    } catch (err) {
+      setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Gagal menghapus server.' });
       setSaving(false);
     }
   };
@@ -376,24 +402,36 @@ export default function ServerSettingsModal({
         </div>
 
         {/* Footer */}
-        <div className="flex gap-3 justify-end text-sm px-6 py-4 border-t border-zinc-800 bg-[#1e1f22] flex-shrink-0">
-          <button
-            type="button"
-            disabled={saving}
-            onClick={onClose}
-            className="px-4 py-2.5 rounded-xl text-zinc-400 hover:text-white transition font-medium"
-          >
-            Batal
-          </button>
+        <div className="flex items-center justify-between gap-3 text-sm px-6 py-4 border-t border-zinc-800 bg-[#1e1f22] flex-shrink-0">
           <button
             type="button"
             disabled={saving || uploadingIcon || uploadingBanner}
-            onClick={handleSave}
-            className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold transition shadow-lg shadow-indigo-500/20 active:scale-95 disabled:opacity-50 flex items-center gap-1.5"
+            onClick={handleDeleteServer}
+            className="flex items-center gap-2 rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-2.5 font-semibold text-rose-300 transition hover:bg-rose-500/15 hover:text-rose-200 disabled:opacity-50"
           >
-            {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-            <span>{saving ? 'Menyimpan...' : 'Simpan Perubahan'}</span>
+            <Trash2 className="w-4 h-4" />
+            Hapus Server
           </button>
+
+          <div className="flex gap-3 justify-end">
+            <button
+              type="button"
+              disabled={saving}
+              onClick={onClose}
+              className="px-4 py-2.5 rounded-xl text-zinc-400 hover:text-white transition font-medium"
+            >
+              Batal
+            </button>
+            <button
+              type="button"
+              disabled={saving || uploadingIcon || uploadingBanner}
+              onClick={handleSave}
+              className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold transition shadow-lg shadow-indigo-500/20 active:scale-95 disabled:opacity-50 flex items-center gap-1.5"
+            >
+              {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+              <span>{saving ? 'Menyimpan...' : 'Simpan Perubahan'}</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>
