@@ -38,7 +38,11 @@ export default function TextChat({ channelId, channelName, currentUserId }: Text
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const [editingMessage, setEditingMessage] = useState<Message | null>(null);
   const [busyMessageId, setBusyMessageId] = useState<string | null>(null);
+  const [typingUsers, setTypingUsers] = useState<Record<string, { displayName: string; avatarUrl: string | null; updatedAt: number }>>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const typingChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const typingStopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isTypingLocalRef = useRef(false);
 
   const normalizeMessage = (message: any): Message => {
     const decoded = decodeMessageContent(message.content || '');
@@ -51,6 +55,22 @@ export default function TextChat({ channelId, channelName, currentUserId }: Text
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const sendTypingEvent = async (isTyping: boolean) => {
+    const profile = profiles[currentUserId];
+    await typingChannelRef.current?.send({
+      type: 'broadcast',
+      event: 'typing',
+      payload: {
+        channelId,
+        userId: currentUserId,
+        displayName: profile?.display_name || 'Unknown',
+        avatarUrl: profile?.avatar_url || null,
+        isTyping,
+        updatedAt: Date.now(),
+      },
+    });
   };
 
   // Fetch profiles given userIds
@@ -76,6 +96,39 @@ export default function TextChat({ channelId, channelName, currentUserId }: Text
     // Setup Realtime synchronously so cleanup works immediately
     const channel = supabase
       .channel(`public:messages:channel_id=eq.${channelId}`)
+      .on(
+        'broadcast',
+        { event: 'typing' },
+        (payload) => {
+          const data = payload.payload as {
+            channelId?: string;
+            userId?: string;
+            displayName?: string;
+            avatarUrl?: string | null;
+            isTyping?: boolean;
+            updatedAt?: number;
+          };
+
+          if (!data?.userId || data.userId === currentUserId || data.channelId !== channelId) return;
+
+          if (data.isTyping) {
+            setTypingUsers((prev) => ({
+              ...prev,
+              [data.userId as string]: {
+                displayName: data.displayName || 'Unknown',
+                avatarUrl: data.avatarUrl ?? null,
+                updatedAt: data.updatedAt || Date.now(),
+              },
+            }));
+          } else {
+            setTypingUsers((prev) => {
+              const next = { ...prev };
+              delete next[data.userId as string];
+              return next;
+            });
+          }
+        }
+      )
       .on(
         'postgres_changes',
         {
@@ -120,6 +173,8 @@ export default function TextChat({ channelId, channelName, currentUserId }: Text
       )
       .subscribe();
 
+    typingChannelRef.current = channel;
+
     const loadMessages = async () => {
       setLoading(true);
       try {
@@ -129,7 +184,7 @@ export default function TextChat({ channelId, channelName, currentUserId }: Text
           setMessages((data.messages || []).map(normalizeMessage));
 
           // Get unique user IDs to fetch profiles
-          const uniqueUserIds = Array.from(new Set(data.messages.map((m: Message) => m.user_id)));
+          const uniqueUserIds = Array.from(new Set([...(data.messages || []).map((m: Message) => m.user_id), currentUserId]));
           await fetchProfiles(uniqueUserIds as string[]);
         }
       } catch (err) {
@@ -143,14 +198,52 @@ export default function TextChat({ channelId, channelName, currentUserId }: Text
     loadMessages();
 
     return () => {
+      if (typingStopTimerRef.current) {
+        clearTimeout(typingStopTimerRef.current);
+      }
+      typingChannelRef.current = null;
       supabase.removeChannel(channel);
     };
-  }, [channelId]);
+  }, [channelId, currentUserId]);
 
   // Scroll to bottom when new messages arrive
   useEffect(() => {
     scrollToBottom();
   }, [messages, profiles]);
+
+  useEffect(() => {
+    const onTypingChange = async () => {
+      if (typingStopTimerRef.current) {
+        clearTimeout(typingStopTimerRef.current);
+      }
+
+      if (!newMessage.trim()) {
+        if (isTypingLocalRef.current) {
+          isTypingLocalRef.current = false;
+          await sendTypingEvent(false);
+        }
+        return;
+      }
+
+      if (!isTypingLocalRef.current) {
+        isTypingLocalRef.current = true;
+        await sendTypingEvent(true);
+      } else {
+        await sendTypingEvent(true);
+      }
+
+      typingStopTimerRef.current = setTimeout(() => {
+        isTypingLocalRef.current = false;
+        sendTypingEvent(false).catch((err) => {
+          console.error('Error stopping typing indicator', err);
+        });
+      }, 1200);
+    };
+
+    onTypingChange().catch((err) => {
+      console.error('Error broadcasting typing state', err);
+    });
+  }, [newMessage, channelId, currentUserId, profiles]);
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -209,7 +302,7 @@ export default function TextChat({ channelId, channelName, currentUserId }: Text
       } else {
         const data = await res.json();
         const created = normalizeMessage(data.message);
-        setMessages((prev) => [...prev, created]);
+        setMessages((prev) => prev.some((message) => message.id === created.id) ? prev : [...prev, created]);
         await fetchProfiles([created.user_id]);
         scrollToBottom();
       }
@@ -272,6 +365,22 @@ export default function TextChat({ channelId, channelName, currentUserId }: Text
   };
 
   const canManageMessage = (message: Message) => message.user_id === currentUserId;
+  const typingPeople = Object.entries(typingUsers)
+    .filter(([userId]) => userId !== currentUserId)
+    .sort((a, b) => b[1].updatedAt - a[1].updatedAt)
+    .slice(0, 3)
+    .map(([userId, data]) => ({ userId, ...data }));
+
+  const typingLabel = () => {
+    if (typingPeople.length === 0) return '';
+    if (typingPeople.length === 1) {
+      return `${typingPeople[0].displayName} sedang mengetik`;
+    }
+    if (typingPeople.length === 2) {
+      return `${typingPeople[0].displayName} dan ${typingPeople[1].displayName} sedang mengetik`;
+    }
+    return `${typingPeople[0].displayName}, ${typingPeople[1].displayName}, dan ${typingPeople.length - 2} lainnya sedang mengetik`;
+  };
 
   return (
     <div className="flex-1 flex min-h-0 flex-col bg-[#313338] relative overflow-hidden">
@@ -383,6 +492,29 @@ export default function TextChat({ channelId, channelName, currentUserId }: Text
                   </div>
                 );
               })}
+              {typingPeople.length > 0 && (
+                <div className="mt-2 flex items-end gap-3 rounded-2xl px-3 py-2.5 pr-16">
+                  <div className="flex-shrink-0 pt-0.5">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#2b2d31] text-xs font-semibold text-white shadow-lg shadow-black/10 ring-2 ring-white/5">
+                      <div className="flex items-center gap-1">
+                        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-zinc-300 [animation-delay:-0.2s]" />
+                        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-zinc-300 [animation-delay:-0.1s]" />
+                        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-zinc-300" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex min-w-0 flex-1 flex-col">
+                    <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                      <span className="text-sm font-semibold text-white">{typingLabel()}</span>
+                    </div>
+                    <div className="mt-1 inline-flex w-fit items-center gap-1.5 rounded-full border border-white/8 bg-white/[0.04] px-3 py-1 text-xs text-zinc-300 shadow-[0_8px_20px_rgba(0,0,0,0.14)] backdrop-blur-sm">
+                      <span className="h-2 w-2 animate-pulse rounded-full bg-indigo-400" />
+                      <span>Sedang mengetik</span>
+                    </div>
+                  </div>
+                </div>
+              )}
               <div ref={messagesEndRef} />
             </div>
           )}
