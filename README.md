@@ -1,36 +1,78 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Voice App
 
-## Getting Started
+## Overview
+This repository contains a **Next.js** based voice application that integrates **LiveKit** for real‑time audio/video, **Supabase** for authentication and storage, and a set of custom UI components.
 
-First, run the development server:
+## Prerequisites
+- **Node.js** (v20 or later) and **npm** (or **pnpm**/**yarn**) installed.
+- A **LiveKit** project with API key/secret.
+- A **Supabase** project (URL and anon/public key).
+- (Optional) **Docker** if you prefer containerised development.
 
+## Setup
+1. **Clone the repository**
+   ```bash
+   git clone <repo-url>
+   cd voice-app
+   ```
+2. **Install dependencies**
+   ```bash
+   npm install   # or `pnpm install` / `yarn`
+   ```
+3. **Configure environment variables**
+   - Copy the example file:
+     ```bash
+     cp .env.example .env.local
+     ```
+   - Fill in the required values:
+     ```
+     NEXT_PUBLIC_LIVEKIT_URL=<your-livekit-url>
+     LIVEKIT_API_KEY=<your-livekit-api-key>
+     LIVEKIT_API_SECRET=<your-livekit-api-secret>
+
+     NEXT_PUBLIC_SUPABASE_URL=<your-supabase-url>
+     NEXT_PUBLIC_SUPABASE_ANON_KEY=<your-supabase-anon-key>
+     ```
+
+## Development
+Run the development server with hot‑reloading:
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+```
+Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+## Building for Production
+```bash
+npm run build   # creates an optimized production build
+npm start       # serves the built app
+```
+You can also deploy to Vercel, Netlify, or any platform that supports Next.js.
+
+## Testing
+- Linting: `npm run lint`
+- (Add unit/integration test commands here if applicable.)
+
+## Project Structure (quick glance)
+```
+voice-app/
+├─ app/                # Next.js app router (pages, API routes)
+│   ├─ api/            # Server‑side API endpoints (e.g., friends, upload)
+│   └─ dashboard/      # Example UI pages
+├─ components/         # Re‑usable React components (modals, profile cards)
+├─ public/             # Static assets
+├─ styles/             # Tailwind CSS config (if any)
+└─ ...
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Common Issues
+- **LiveKit connection errors** – double‑check the LiveKit URL, API key, and secret.
+- **Supabase auth failures** – ensure the Supabase URL and anon key are correct and that the project allows public sign‑in.
+- **Missing env variables** – the app will crash on start if required env vars are not defined.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Contributing
+1. Fork the repo.
+2. Create a feature branch.
+3. Open a Pull Request with a clear description of your changes.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+---
+*Happy coding!*
