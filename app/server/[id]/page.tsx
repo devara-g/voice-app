@@ -168,102 +168,108 @@ export default function ServerDetail() {
     };
 
     const checkUserAndFetch = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        router.push('/');
-        return;
-      }
-      setCurrentUser(user);
-      setDisplayName(user.user_metadata?.display_name ?? user.email?.split('@')[0] ?? 'User');
-      setAvatarUrl(user.user_metadata?.avatar_url ?? 'preset:purple');
+      try {
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        if (authError || !user) {
+          router.push('/');
+          return;
+        }
+        setCurrentUser(user);
+        setDisplayName(user.user_metadata?.display_name ?? user.email?.split('@')[0] ?? 'User');
+        setAvatarUrl(user.user_metadata?.avatar_url ?? 'preset:purple');
 
-      // Ambil data server aktif
-      const { data: serverData, error: serverError } = await supabase
-        .from('servers')
-        .select('*')
-        .eq('id', serverId)
-        .single();
+        // Ambil data server aktif
+        const { data: serverData, error: serverError } = await supabase
+          .from('servers')
+          .select('*')
+          .eq('id', serverId)
+          .single();
 
-      if (serverError || !serverData) {
-        console.error('Server tidak ditemukan:', serverError);
-        router.push('/dashboard');
-        return;
-      }
-      setServer(serverData);
+        if (serverError || !serverData) {
+          console.error('Server tidak ditemukan:', serverError);
+          router.push('/dashboard');
+          return;
+        }
+        setServer(serverData);
 
-      // Ambil daftar seluruh server milik pengguna untuk sidebar
-      const { data: allServers } = await supabase
-        .from('servers')
-        .select('*')
-        .eq('owner_id', user.id)
-        .order('created_at', { ascending: true });
-      if (allServers) setServers(allServers);
+        // Ambil daftar seluruh server milik pengguna untuk sidebar
+        const { data: allServers } = await supabase
+          .from('servers')
+          .select('*')
+          .eq('owner_id', user.id)
+          .order('created_at', { ascending: true });
+        if (allServers) setServers(allServers);
 
-      // Ambil data saluran suara
-      const { data: channelsData, error: channelsError } = await supabase
-        .from('channels')
-        .select('*')
-        .eq('server_id', serverId)
-        .order('created_at', { ascending: true });
+        // Ambil data saluran suara
+        const { data: channelsData, error: channelsError } = await supabase
+          .from('channels')
+          .select('*')
+          .eq('server_id', serverId)
+          .order('created_at', { ascending: true });
 
-      if (!channelsError && channelsData && channelsData.length > 0) {
-        setChannels(channelsData);
-        // Auto-select first text channel
-        const firstText = channelsData.find((c: Channel) => c.type === 'text');
-        if (firstText) setActiveTextChannel({ id: firstText.id, name: firstText.name });
-      } else {
-        await createDefaultChannel();
-      }
-
-      // Ambil data anggota pelayan
-      const { data: membersData, error: membersError } = await supabase
-        .from('members')
-        .select('user_id')
-        .eq('server_id', serverId);
-
-      if (!membersError) {
-        const userIdsSet = new Set(membersData?.map((m: { user_id: string }) => m.user_id) || []);
-        if (serverData?.owner_id) {
-          userIdsSet.add(serverData.owner_id);
+        if (!channelsError && channelsData && channelsData.length > 0) {
+          setChannels(channelsData);
+          // Auto-select first text channel
+          const firstText = channelsData.find((c: Channel) => c.type === 'text');
+          if (firstText) setActiveTextChannel({ id: firstText.id, name: firstText.name });
+        } else {
+          await createDefaultChannel();
         }
 
-        const userIds = Array.from(userIdsSet);
-        let emailMap: Record<string, string> = {};
-        let profileMap: Record<string, { email: string; display_name: string; avatar_url: string | null; bio: string | null }> = {};
+        // Ambil data anggota pelayan
+        const { data: membersData, error: membersError } = await supabase
+          .from('members')
+          .select('user_id')
+          .eq('server_id', serverId);
 
-        try {
-          const emailResponse = await fetch('/api/users/emails', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ userIds }),
-          });
-
-          if (emailResponse.ok) {
-            const emailData = await emailResponse.json();
-            emailMap = emailData.emails || {};
-            profileMap = emailData.profiles || {};
+        if (!membersError) {
+          const userIdsSet = new Set(membersData?.map((m: { user_id: string }) => m.user_id) || []);
+          if (serverData?.owner_id) {
+            userIdsSet.add(serverData.owner_id);
           }
-        } catch (err) {
-          console.error('Gagal mendapatkan e-mel ahli:', err);
+
+          const userIds = Array.from(userIdsSet);
+          let emailMap: Record<string, string> = {};
+          let profileMap: Record<string, { email: string; display_name: string; avatar_url: string | null; bio: string | null }> = {};
+
+          try {
+            const emailResponse = await fetch('/api/users/emails', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ userIds }),
+            });
+
+            if (emailResponse.ok) {
+              const emailData = await emailResponse.json();
+              emailMap = emailData.emails || {};
+              profileMap = emailData.profiles || {};
+            }
+          } catch (err) {
+            console.error('Gagal mendapatkan e-mel ahli:', err);
+          }
+
+          const membersWithProfiles = userIds.map((user_id: string) => {
+            const profile = profileMap[user_id];
+            return {
+              user_id: user_id,
+              email: profile?.email || emailMap[user_id] || 'Unknown',
+              display_name: profile?.display_name || emailMap[user_id]?.split('@')[0] || 'Unknown',
+              avatar_url: profile?.avatar_url || null,
+              banner_url: (profile as any)?.banner_url || null,
+              bio: profile?.bio || null,
+            };
+          });
+          setMembers(membersWithProfiles);
         }
-
-        const membersWithProfiles = userIds.map((user_id: string) => {
-          const profile = profileMap[user_id];
-          return {
-            user_id: user_id,
-            email: profile?.email || emailMap[user_id] || 'Unknown',
-            display_name: profile?.display_name || emailMap[user_id]?.split('@')[0] || 'Unknown',
-            avatar_url: profile?.avatar_url || null,
-            banner_url: (profile as any)?.banner_url || null,
-            bio: profile?.bio || null,
-          };
-        });
-        setMembers(membersWithProfiles);
+      } catch (err) {
+        console.error('Failed to authenticate or fetch data:', err);
+        // Do not redirect to / immediately if it's just a transient network error, 
+        // but maybe we can just stop loading.
+      } finally {
+        setLoading(false);
       }
-
-      setLoading(false);
     };
 
     checkUserAndFetch();
@@ -501,7 +507,7 @@ export default function ServerDetail() {
               )}
 
               {/* Header Server Name */}
-              <div className="h-14 flex items-center justify-between px-4 border-b border-[#1e1f22] shadow-sm bg-[#2b2d31]/80 backdrop-blur-md flex-shrink-0">
+              <div className="h-14 flex items-center justify-between px-4 border-b border-[#1e1f22] shadow-sm bg-[#2b2d31] flex-shrink-0">
                 <h2 className="text-white font-extrabold text-sm truncate uppercase tracking-wider flex-1 min-w-0">{server?.name}</h2>
                 <div className="flex items-center gap-1 flex-shrink-0">
                   {/* Server Settings — only owner */}
@@ -922,7 +928,7 @@ export default function ServerDetail() {
 
       {/* 7. Modal Kustom - Pembuatan Server */}
       {isCreateServerOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
           <div className="bg-[#2b2d31] border border-[#35373d] p-6 rounded-2xl w-full max-w-md shadow-2xl animate-fade-in">
             <h2 className="text-white text-xl font-bold mb-2">Buat Server Baru</h2>
             <p className="text-slate-400 text-sm mb-4">Beri nama server baru Anda agar teman-teman Anda dapat mengenalinya.</p>

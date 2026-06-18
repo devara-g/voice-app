@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
-import { decodeMessageContent, encodeMessageContent, MessageReplyMeta } from '@/lib/messageFormat';
+import { decodeMessageContent, encodeMessageContent, MessageReplyMeta, MessageAttachment } from '@/lib/messageFormat';
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -34,6 +34,7 @@ export async function GET(req: NextRequest) {
       ...message,
       content: decoded.content,
       reply_meta: decoded.replyMeta,
+      attachments: decoded.attachments,
     };
   });
 
@@ -42,13 +43,17 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const { channel_id, user_id, content, reply_meta } = await req.json();
+    const { channel_id, user_id, content, reply_meta, attachments } = await req.json();
 
-    if (!channel_id || !user_id || !content) {
+    if (!channel_id || !user_id) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
+    // Perlu content atau attachments
+    if (!content && (!attachments || attachments.length === 0)) {
+      return NextResponse.json({ error: 'Pesan tidak boleh kosong' }, { status: 400 });
+    }
 
-    const storedContent = encodeMessageContent(content, reply_meta || null);
+    const storedContent = encodeMessageContent(content || '', reply_meta || null, attachments || null);
 
     const { data, error } = await supabaseAdmin
       .from('messages')
@@ -66,6 +71,7 @@ export async function POST(req: NextRequest) {
         ...data,
         content: decoded.content,
         reply_meta: decoded.replyMeta,
+        attachments: decoded.attachments,
       },
     });
   } catch (error: any) {
@@ -96,7 +102,7 @@ export async function PATCH(req: NextRequest) {
     }
 
     const decodedExisting = decodeMessageContent(existing.content || '');
-    const storedContent = encodeMessageContent(content, reply_meta ?? decodedExisting.replyMeta);
+    const storedContent = encodeMessageContent(content, reply_meta ?? decodedExisting.replyMeta, decodedExisting.attachments);
 
     const { data, error } = await supabaseAdmin
       .from('messages')
@@ -115,6 +121,7 @@ export async function PATCH(req: NextRequest) {
         ...data,
         content: decoded.content,
         reply_meta: decoded.replyMeta,
+        attachments: decoded.attachments,
       },
     });
   } catch (error: any) {

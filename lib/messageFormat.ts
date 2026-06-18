@@ -7,24 +7,60 @@ export interface MessageReplyMeta {
   createdAt: string;
 }
 
-const REPLY_PREFIX = '[[sihalo-reply:';
+export interface MessageAttachment {
+  url: string;
+  type: 'image' | 'audio';
+  name?: string;
+}
 
-export function encodeMessageContent(content: string, replyMeta?: MessageReplyMeta | null) {
-  if (!replyMeta) return content;
-  return `${REPLY_PREFIX}${encodeURIComponent(JSON.stringify(replyMeta))}]]\n${content}`;
+const REPLY_PREFIX = '[[sihalo-reply:';
+const ATTACH_PREFIX = '[[sihalo-attach:';
+
+export function encodeMessageContent(
+  content: string,
+  replyMeta?: MessageReplyMeta | null,
+  attachments?: MessageAttachment[] | null
+) {
+  let encoded = '';
+
+  if (replyMeta) {
+    encoded += `${REPLY_PREFIX}${encodeURIComponent(JSON.stringify(replyMeta))}]]\n`;
+  }
+
+  if (attachments && attachments.length > 0) {
+    encoded += `${ATTACH_PREFIX}${encodeURIComponent(JSON.stringify(attachments))}]]\n`;
+  }
+
+  encoded += content;
+  return encoded;
 }
 
 export function decodeMessageContent(rawContent: string) {
-  const match = rawContent.match(/^\[\[sihalo-reply:([^\]]+)\]\]\n([\s\S]*)$/);
+  let remaining = rawContent;
+  let replyMeta: MessageReplyMeta | null = null;
+  let attachments: MessageAttachment[] | null = null;
 
-  if (!match) {
-    return { content: rawContent, replyMeta: null as MessageReplyMeta | null };
+  // Extract reply meta
+  const replyMatch = remaining.match(/^\[\[sihalo-reply:([^\]]+)\]\]\n([\s\S]*)$/);
+  if (replyMatch) {
+    try {
+      replyMeta = JSON.parse(decodeURIComponent(replyMatch[1])) as MessageReplyMeta;
+      remaining = replyMatch[2];
+    } catch {
+      // ignore parse error
+    }
   }
 
-  try {
-    const replyMeta = JSON.parse(decodeURIComponent(match[1])) as MessageReplyMeta;
-    return { content: match[2], replyMeta };
-  } catch {
-    return { content: rawContent, replyMeta: null as MessageReplyMeta | null };
+  // Extract attachments
+  const attachMatch = remaining.match(/^\[\[sihalo-attach:([^\]]+)\]\]\n([\s\S]*)$/);
+  if (attachMatch) {
+    try {
+      attachments = JSON.parse(decodeURIComponent(attachMatch[1])) as MessageAttachment[];
+      remaining = attachMatch[2];
+    } catch {
+      // ignore parse error
+    }
   }
+
+  return { content: remaining, replyMeta, attachments };
 }

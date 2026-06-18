@@ -83,19 +83,24 @@ export default function Dashboard() {
     };
 
     const loadDashboard = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
-        router.push('/');
-        return;
-      } else {
-        setUserEmail(user.email ?? null);
-        setUserId(user.id);
-        setDisplayName(user.user_metadata?.display_name ?? user.email?.split('@')[0] ?? 'User');
-        setAvatarUrl(user.user_metadata?.avatar_url ?? 'preset:purple');
-      }
+      try {
+        const { data: { user }, error } = await supabase.auth.getUser();
+        
+        if (error || !user) {
+          router.push('/');
+          return;
+        } else {
+          setUserEmail(user.email ?? null);
+          setUserId(user.id);
+          setDisplayName(user.user_metadata?.display_name ?? user.email?.split('@')[0] ?? 'User');
+          setAvatarUrl(user.user_metadata?.avatar_url ?? 'preset:purple');
+        }
 
-      await fetchServers(user.id);
+        await fetchServers(user.id);
+      } catch (err) {
+        console.error('Failed to load dashboard:', err);
+        router.push('/');
+      }
     };
 
     loadDashboard();
@@ -452,7 +457,7 @@ export default function Dashboard() {
                       />
                     )}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
-                    <div className="absolute top-4 right-4 bg-black/35 backdrop-blur-md px-2 py-1 rounded-md text-[10px] text-white uppercase tracking-wider font-bold border border-white/5">
+                    <div className="absolute top-4 right-4 bg-black/80 px-2 py-1 rounded-md text-[10px] text-white uppercase tracking-wider font-bold border border-white/5">
                       Server
                     </div>
                   </div>
@@ -515,7 +520,7 @@ export default function Dashboard() {
 
       {/* Modal Kustom - Pembuatan Server */}
       {isCreateModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
           <div className="bg-[#2b2d31] border border-[#35373d] p-6 rounded-2xl w-full max-w-md shadow-2xl animate-fade-in">
             <h2 className="text-white text-xl font-bold mb-2">Buat Server Baru</h2>
             <p className="text-slate-400 text-sm mb-4">Beri nama server baru Anda agar teman-teman Anda dapat mengenalinya.</p>

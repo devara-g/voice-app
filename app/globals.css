@@ -2,20 +2,39 @@
 
 /* Custom scrollbar ala Discord */
 ::-webkit-scrollbar {
-  width: 6px;
+  width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #1e1f22;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #404249;
-  border-radius: 6px;
+  background: #1a1b1e;
+  border-radius: 8px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #5865f2;
+  background: #2b2d31;
+}
+
+/* Custom scrollbar class untuk digunakan secara eksplisit */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #1a1b1e;
+  border-radius: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #2b2d31;
 }
 
 /* Animasi fade-in untuk modal & kartu */
@@ -58,20 +77,32 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Custom scrollbar class untuk digunakan secara eksplisit */
-.custom-scrollbar::-webkit-scrollbar {
-  width: 4px;
+/* Animasi highlight pesan saat scroll-to-reply */
+@keyframes messageHighlight {
+  0%   { background-color: rgba(88, 101, 242, 0.25); }
+  60%  { background-color: rgba(88, 101, 242, 0.15); }
+  100% { background-color: transparent; }
 }
 
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
+.message-highlight {
+  animation: messageHighlight 1.8s ease-out forwards;
+  border-radius: 12px;
 }
 
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #404249;
-  border-radius: 4px;
+/* Animasi waveform rekam suara */
+@keyframes waveBar {
+  0%, 100% { transform: scaleY(0.3); }
+  50%       { transform: scaleY(1); }
 }
 
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #5865f2;
+.wave-bar {
+  width: 3px;
+  border-radius: 2px;
+  background: #f87171;
+  transform-origin: bottom;
+  animation: waveBar 0.6s ease-in-out infinite;
 }
+.wave-bar:nth-child(2) { animation-delay: 0.1s; }
+.wave-bar:nth-child(3) { animation-delay: 0.2s; }
+.wave-bar:nth-child(4) { animation-delay: 0.3s; }
+.wave-bar:nth-child(5) { animation-delay: 0.4s; }

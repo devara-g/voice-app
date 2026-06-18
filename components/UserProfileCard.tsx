@@ -52,7 +52,7 @@ export default function UserProfileCard({
 
   return (
     <div
-      className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm transition-opacity"
+      className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/80 transition-opacity"
       onClick={onClose}
     >
       <div
@@ -77,7 +77,7 @@ export default function UserProfileCard({
           {/* Controls */}
           <button
             onClick={onClose}
-            className="absolute top-3 right-3 w-8 h-8 bg-black/40 hover:bg-black/70 backdrop-blur-md rounded-full flex items-center justify-center text-white/70 hover:text-white transition-all hover:scale-105 active:scale-95 z-10"
+            className="absolute top-3 right-3 w-8 h-8 bg-black/60 hover:bg-black/90 rounded-full flex items-center justify-center text-white/70 hover:text-white transition-all hover:scale-105 active:scale-95 z-10"
           >
             <X className="w-4 h-4" />
           </button>
@@ -85,13 +85,13 @@ export default function UserProfileCard({
           {/* Badges on Banner */}
           <div className="absolute top-3 left-3 flex flex-wrap gap-1.5 z-10">
             {isOwner && (
-              <div className="bg-amber-500/90 backdrop-blur-md border border-amber-400/50 text-white text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1 shadow-lg">
+              <div className="bg-amber-500 border border-amber-400/50 text-white text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1 shadow-lg">
                 <Crown className="w-3 h-3" />
                 <span>Owner</span>
               </div>
             )}
             {isCurrentUser && (
-              <div className="bg-indigo-500/90 backdrop-blur-md border border-indigo-400/50 text-white text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1 shadow-lg">
+              <div className="bg-indigo-500 border border-indigo-400/50 text-white text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1 shadow-lg">
                 <Sparkles className="w-3 h-3" />
                 <span>Kamu</span>
               </div>
@@ -147,7 +147,7 @@ export default function UserProfileCard({
           <div className="w-full h-px bg-white/5 mb-5" />
 
           {/* Bio Section */}
-          <div className="bg-[#1e1f22]/60 backdrop-blur-xl border border-white/5 rounded-[16px] p-4 mb-5">
+          <div className="bg-[#1e1f22] border border-[#1e1f22] rounded-[16px] p-4 mb-5 shadow-inner">
             <h4 className="text-zinc-400 text-[10px] font-bold uppercase tracking-widest mb-2 flex items-center gap-1.5">
               <UserIcon className="w-3.5 h-3.5" />
               Tentang Saya
